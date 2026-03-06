@@ -84,7 +84,7 @@ function renderMemberCard(m, options = {}) {
       </div>
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
-          <span class="font-bold text-sm text-gray-900 truncate">${name}</span>
+          <span class="font-bold text-sm text-gray-900">${name}</span>
           ${!regPaid ? '<span class="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" title="Registration fee not paid">!</span>' : '<span class="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-white text-xs flex-shrink-0"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></span>'}
         </div>
         <p class="text-xs text-gray-500 truncate">${m.email || 'No email'}</p>
@@ -146,14 +146,17 @@ function navigateTo(pageName) {
   const navLink = document.querySelector(`[data-page="${pageName}"]`);
   if (navLink) navLink.classList.add('active');
 
-  // Remove padding for POS page (full-bleed layout)
+  // Remove padding and hide sidebar for POS page (full-bleed layout like Beta)
   const container = document.getElementById('page-container');
+  const sidebar = document.getElementById('sidebar');
   if (pageName === 'pos') {
     container.classList.remove('p-6');
     container.classList.add('p-0');
+    if (sidebar) sidebar.classList.add('hidden');
   } else {
     container.classList.remove('p-0');
     container.classList.add('p-6');
+    if (sidebar) sidebar.classList.remove('hidden');
   }
 
   loadPage(pageName);
@@ -570,16 +573,16 @@ async function loadMembers() {
       <input type="text" id="member-search" class="form-input" placeholder="Search members by name, email, or phone..." oninput="searchMembers(this.value)">
     </div>
 
-    <div class="card p-0 overflow-hidden">
-      <table class="data-table">
+    <div class="card p-0 overflow-x-auto">
+      <table class="data-table w-full">
         <thead>
           <tr>
-            <th>Member</th>
-            <th>Email</th>
-            <th>Reg.</th>
-            <th>Waiver</th>
-            <th>Pass</th>
-            <th>Joined</th>
+            <th class="whitespace-nowrap">Member</th>
+            <th class="whitespace-nowrap">Email</th>
+            <th class="whitespace-nowrap text-center">Reg.</th>
+            <th class="whitespace-nowrap text-center">Waiver</th>
+            <th class="whitespace-nowrap">Pass</th>
+            <th class="whitespace-nowrap">Joined</th>
           </tr>
         </thead>
         <tbody id="members-table-body">
