@@ -11,7 +11,7 @@ async function loadPOS() {
   el.innerHTML = `
     <div class="flex gap-4 h-[calc(100vh-7rem)]">
       <!-- Left: Product Grid -->
-      <div class="flex-1 flex flex-col min-w-0">
+      <div class="flex-1 flex flex-col overflow-hidden" style="min-width: 0;">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-2xl font-bold text-gray-900">Point of Sale</h2>
           <div class="flex gap-2">
@@ -28,7 +28,7 @@ async function loadPOS() {
       </div>
 
       <!-- Right: Cart -->
-      <div class="w-96 flex flex-col bg-white border border-gray-200 rounded-xl flex-shrink-0">
+      <div class="w-80 flex flex-col bg-white border border-gray-200 rounded-xl" style="flex-shrink: 0; min-width: 320px;">
         <!-- Member selection -->
         <div class="p-4 border-b border-gray-100">
           <div class="flex gap-2">

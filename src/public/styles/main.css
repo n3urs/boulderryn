@@ -68,8 +68,8 @@ body {
 /* ============================================================
    Page visibility
    ============================================================ */
-.page { display: none; }
-.page.active { display: block; }
+.page { display: none !important; }
+.page.active { display: block !important; }
 
 /* ============================================================
    Cards
