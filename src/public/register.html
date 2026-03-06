@@ -495,26 +495,9 @@
     });
 
     document.getElementById('staff-skip-btn').addEventListener('click', function() {
-      const pin = prompt('Staff PIN:');
-      if (!pin) return;
-      // Verify PIN with server
-      fetch('/api/staff/auth/pin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin })
-      })
-      .then(r => r.json())
-      .then(data => {
-        if (data.error) {
-          alert('Invalid PIN');
-          return;
-        }
-        // PIN accepted — skip video
-        videoEnded = true;
-        killVideo();
-        goToStep(2);
-      })
-      .catch(() => alert('Could not verify PIN'));
+      videoEnded = true;
+      killVideo();
+      goToStep(2);
     });
 
     // =============================================
