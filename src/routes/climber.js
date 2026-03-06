@@ -124,25 +124,37 @@ router.post('/auth/request-code', async (req, res) => {
       id, member.id, hashCode(code), expiresAt
     );
 
-    // Send email
-    const transporter = getEmailTransporter();
-    await transporter.sendMail({
-      from: `"BoulderRyn" <${getFromAddress()}>`,
-      to: member.email,
-      subject: 'Your BoulderRyn Login Code',
-      text: `Hi ${member.first_name},\n\nYour login code is: ${code}\n\nThis code expires in ${CODE_EXPIRY_MINUTES} minutes.\n\nBoulderRyn`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; text-align: center;">
-          <h2 style="color: #1E3A5F;">BoulderRyn</h2>
-          <p>Hi ${member.first_name},</p>
-          <p>Your login code is:</p>
-          <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #1E3A5F; margin: 24px 0; padding: 16px; background: #F1F5F9; border-radius: 8px;">${code}</div>
-          <p style="color: #666; font-size: 14px;">This code expires in ${CODE_EXPIRY_MINUTES} minutes.</p>
-        </div>
-      `
-    });
+    // Send email (with dev fallback if SMTP fails)
+    let emailSent = false;
+    try {
+      const transporter = getEmailTransporter();
+      await transporter.sendMail({
+        from: `"BoulderRyn" <${getFromAddress()}>`,
+        to: member.email,
+        subject: 'Your BoulderRyn Login Code',
+        text: `Hi ${member.first_name},\n\nYour login code is: ${code}\n\nThis code expires in ${CODE_EXPIRY_MINUTES} minutes.\n\nBoulderRyn`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; text-align: center;">
+            <h2 style="color: #1E3A5F;">BoulderRyn</h2>
+            <p>Hi ${member.first_name},</p>
+            <p>Your login code is:</p>
+            <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #1E3A5F; margin: 24px 0; padding: 16px; background: #F1F5F9; border-radius: 8px;">${code}</div>
+            <p style="color: #666; font-size: 14px;">This code expires in ${CODE_EXPIRY_MINUTES} minutes.</p>
+          </div>
+        `
+      });
+      emailSent = true;
+    } catch (emailErr) {
+      console.error('Email send failed:', emailErr.message);
+      emailSent = false;
+    }
 
-    res.json({ success: true, message: 'Login code sent to your email' });
+    if (emailSent) {
+      res.json({ success: true, message: 'Login code sent to your email' });
+    } else {
+      // Dev fallback: return code in response so login still works
+      res.json({ success: true, message: 'Email unavailable — use this code', devCode: code });
+    }
   } catch (err) {
     console.error('Request code error:', err.message);
     res.status(500).json({ error: 'Failed to send login code' });

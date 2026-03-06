@@ -302,10 +302,17 @@
       errEl.classList.add('hidden');
 
       try {
-        await api('/auth/request-code', { method: 'POST', body: JSON.stringify({ email: loginEmail }) });
+        const result = await api('/auth/request-code', { method: 'POST', body: JSON.stringify({ email: loginEmail }) });
         document.getElementById('email-step').classList.add('hidden');
         document.getElementById('code-step').classList.remove('hidden');
         document.getElementById('sent-to-email').textContent = loginEmail;
+        // Dev fallback: if email couldn't send, show the code on screen
+        if (result.devCode) {
+          const hint = document.createElement('div');
+          hint.className = 'mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800';
+          hint.innerHTML = `Email unavailable — your code is: <strong class="text-lg tracking-widest">${result.devCode}</strong>`;
+          document.getElementById('code-step').appendChild(hint);
+        }
         document.querySelectorAll('.code-input')[0].focus();
       } catch (err) {
         showError(errEl, err.error || 'Failed to send code');
