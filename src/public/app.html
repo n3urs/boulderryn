@@ -139,8 +139,13 @@
 
     <!-- ROUTES PAGE -->
     <div id="page-routes" class="page fade-in">
-      <div class="px-5 pt-6 pb-3">
+      <div class="px-5 pt-6 pb-3 flex items-center justify-between">
         <h1 class="text-2xl font-bold text-navy">Routes</h1>
+        <!-- Map / List toggle -->
+        <div class="flex bg-gray-100 rounded-lg p-0.5">
+          <button id="view-list-btn" onclick="setRoutesView('list')" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-navy shadow-sm transition">List</button>
+          <button id="view-map-btn" onclick="setRoutesView('map')" class="px-3 py-1.5 text-xs font-medium rounded-md text-gray-500 transition">Map</button>
+        </div>
       </div>
 
       <!-- Filters -->
@@ -156,8 +161,46 @@
         </select>
       </div>
 
+      <!-- List View -->
       <div id="routes-list" class="px-5 space-y-6 pb-4">
         <p class="text-sm text-gray-400">Loading...</p>
+      </div>
+
+      <!-- Map View -->
+      <div id="routes-map" class="px-3 pb-4 hidden">
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div class="relative" style="touch-action: pan-x pan-y;">
+            <svg id="climber-gym-map" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet"
+              class="w-full" style="min-height: 280px; background: #F8FAFC;">
+              <!-- Reception -->
+              <rect x="30" y="30" width="70" height="50" rx="6" fill="#94A3B8" fill-opacity="0.15" stroke="#94A3B8" stroke-opacity="0.3" stroke-width="1"/>
+              <text x="65" y="60" text-anchor="middle" fill="#94A3B8" font-size="11" font-weight="600">Reception</text>
+
+              <!-- Wall shapes -->
+              <path d="M 100,130 L 145,155 L 260,100 L 400,155 L 530,100 L 620,100 L 660,180 L 680,300 L 690,420 L 690,450"
+                fill="none" stroke="#0EA5E9" stroke-opacity="0.7" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M 280,320 L 280,245 L 320,210 L 500,205 L 540,240 L 540,320 L 500,355 L 320,360 Z"
+                fill="#EAB308" fill-opacity="0.12" stroke="#EAB308" stroke-opacity="0.6" stroke-width="3"/>
+              <path d="M 120,490 L 170,530 L 380,505 L 560,520 L 620,515 L 620,570"
+                fill="none" stroke="#EF4444" stroke-opacity="0.7" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+              <!-- Wall labels -->
+              <text x="350" y="80" text-anchor="middle" fill="#64748B" fill-opacity="0.5" font-size="16" font-weight="700">COVE WALL</text>
+              <text x="410" y="290" text-anchor="middle" fill="#64748B" fill-opacity="0.5" font-size="14" font-weight="700">MOTHERSHIP</text>
+              <text x="390" y="565" text-anchor="middle" fill="#64748B" fill-opacity="0.5" font-size="14" font-weight="700">MAGICAL MYSTERY</text>
+
+              <!-- Climb dots rendered by JS -->
+              <g id="map-climb-dots"></g>
+            </svg>
+          </div>
+          <!-- Legend -->
+          <div class="px-3 py-2 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-500 overflow-x-auto no-scrollbar">
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block"></span> Cove</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block"></span> Mothership</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span> Mystery</span>
+            <span class="flex items-center gap-1 ml-auto"><span class="w-2.5 h-2.5 rounded-full border-2 border-green-500 inline-block"></span> Sent</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -538,6 +581,9 @@
         return;
       }
 
+      // Also update map dots if in map view
+      if (routesView === 'map') renderMapDots();
+
       el.innerHTML = Object.entries(grouped).map(([wallName, climbs]) => `
         <div>
           <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">${wallName}</h3>
@@ -557,6 +603,148 @@
           </div>
         </div>
       `).join('');
+    }
+
+    // ── Routes View Toggle ──────────────────────────────────
+    let routesView = 'list';
+
+    function setRoutesView(view) {
+      routesView = view;
+      const listEl = document.getElementById('routes-list');
+      const mapEl = document.getElementById('routes-map');
+      const listBtn = document.getElementById('view-list-btn');
+      const mapBtn = document.getElementById('view-map-btn');
+
+      if (view === 'map') {
+        listEl.classList.add('hidden');
+        mapEl.classList.remove('hidden');
+        mapBtn.className = 'px-3 py-1.5 text-xs font-medium rounded-md bg-white text-navy shadow-sm transition';
+        listBtn.className = 'px-3 py-1.5 text-xs font-medium rounded-md text-gray-500 transition';
+        renderMapDots();
+      } else {
+        listEl.classList.remove('hidden');
+        mapEl.classList.add('hidden');
+        listBtn.className = 'px-3 py-1.5 text-xs font-medium rounded-md bg-white text-navy shadow-sm transition';
+        mapBtn.className = 'px-3 py-1.5 text-xs font-medium rounded-md text-gray-500 transition';
+      }
+    }
+
+    // Wall path data (must match staff-side app.js)
+    const CLIMBER_WALL_PATHS = {
+      'Cove Wall': {
+        path: 'M 100,130 L 145,155 L 260,100 L 400,155 L 530,100 L 620,100 L 660,180 L 680,300 L 690,420 L 690,450',
+        closed: false
+      },
+      'Mothership': {
+        path: 'M 280,320 L 280,245 L 320,210 L 500,205 L 540,240 L 540,320 L 500,355 L 320,360 Z',
+        closed: true
+      },
+      'Magical Mystery': {
+        path: 'M 120,490 L 170,530 L 380,505 L 560,520 L 620,515 L 620,570',
+        closed: false
+      }
+    };
+
+    function parsePath(d) {
+      const pts = [];
+      const parts = d.replace(/Z/gi, '').trim().split(/[ML]\s*/i).filter(Boolean);
+      parts.forEach(p => {
+        const [x, y] = p.trim().split(/[,\s]+/).map(Number);
+        if (!isNaN(x) && !isNaN(y)) pts.push({ x, y });
+      });
+      return pts;
+    }
+
+    function distributeOnPath(pts, count, closed) {
+      if (count === 0) return [];
+      // Get total length
+      const segs = [];
+      let totalLen = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const dx = pts[i].x - pts[i-1].x;
+        const dy = pts[i].y - pts[i-1].y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        segs.push({ from: pts[i-1], to: pts[i], len });
+        totalLen += len;
+      }
+      const positions = [];
+      const spacing = totalLen / (count + 1);
+      for (let i = 0; i < count; i++) {
+        let target = spacing * (i + 1);
+        let acc = 0;
+        for (const seg of segs) {
+          if (acc + seg.len >= target) {
+            const t = (target - acc) / seg.len;
+            positions.push({
+              x: seg.from.x + (seg.to.x - seg.from.x) * t,
+              y: seg.from.y + (seg.to.y - seg.from.y) * t
+            });
+            break;
+          }
+          acc += seg.len;
+        }
+      }
+      return positions;
+    }
+
+    function renderMapDots() {
+      const dotsEl = document.getElementById('map-climb-dots');
+      if (!dotsEl) return;
+
+      const wall = document.getElementById('filter-wall').value;
+      const grade = document.getElementById('filter-grade').value;
+      const colour = document.getElementById('filter-colour').value;
+
+      let filtered = allRoutes;
+      if (wall) filtered = filtered.filter(r => r.wall_name === wall);
+      if (grade) filtered = filtered.filter(r => r.grade === grade);
+      if (colour) filtered = filtered.filter(r => r.colour === colour);
+
+      // Group by wall
+      const byWall = {};
+      filtered.forEach(r => {
+        if (!byWall[r.wall_name]) byWall[r.wall_name] = [];
+        byWall[r.wall_name].push(r);
+      });
+
+      let svg = '';
+      Object.entries(byWall).forEach(([wallName, climbs]) => {
+        const wallDef = CLIMBER_WALL_PATHS[wallName];
+        if (!wallDef) return;
+        const pts = parsePath(wallDef.path);
+        const positions = [];
+
+        // Use stored map positions if available, otherwise distribute
+        climbs.forEach((c, i) => {
+          if (c.map_x && c.map_y) {
+            positions.push({ x: c.map_x, y: c.map_y });
+          } else {
+            const distributed = distributeOnPath(pts, climbs.length, wallDef.closed);
+            if (distributed[i]) positions.push(distributed[i]);
+          }
+        });
+
+        climbs.forEach((c, i) => {
+          if (!positions[i]) return;
+          const { x, y } = positions[i];
+          const hex = colourHex(c.colour);
+          const sent = c.sent;
+          const r = 12;
+
+          svg += `<g class="cursor-pointer" onclick="showClimbModal('${c.id}')">`;
+          // Outer ring if sent
+          if (sent) {
+            svg += `<circle cx="${x}" cy="${y}" r="${r + 3}" fill="none" stroke="#22C55E" stroke-width="2.5"/>`;
+          }
+          // Main dot
+          svg += `<circle cx="${x}" cy="${y}" r="${r}" fill="${hex}" stroke="white" stroke-width="2"/>`;
+          // Grade label
+          svg += `<text x="${x}" y="${y + 1}" text-anchor="middle" dominant-baseline="central" fill="white" font-size="8" font-weight="700">${c.grade}</text>`;
+          svg += `</g>`;
+        });
+      });
+
+      dotsEl.innerHTML = svg;
     }
 
     function showClimbModal(climbId) {

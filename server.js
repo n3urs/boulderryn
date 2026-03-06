@@ -12,7 +12,7 @@ const Waiver = require('./src/main/models/waiver');
 const { seedProducts } = require('./src/main/models/seed-products');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
