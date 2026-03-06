@@ -168,7 +168,7 @@ async function posLoadProducts() {
               class="pos-category-btn bg-gradient-to-br ${gradient} text-white rounded-xl p-3 text-left hover:shadow-lg hover:scale-[1.02] transition-all relative overflow-hidden"
               data-cat="${g.id}">
         <div class="text-2xl mb-1">${g.icon || '📦'}</div>
-        <div class="font-bold text-sm leading-tight">${g.name}</div>
+        <div class="font-bold text-xs sm:text-sm leading-tight">${g.name}</div>
         <div class="text-xs opacity-75">${g.products.length} items</div>
       </button>
     `;

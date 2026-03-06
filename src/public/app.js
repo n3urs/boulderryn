@@ -546,7 +546,7 @@ async function doCheckIn(memberId) {
         <svg class="w-16 h-16 mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
         <p class="checkin-name">${result.member ? result.member.first_name + ' ' + result.member.last_name : 'Unknown'}</p>
         <p class="text-red-500 font-semibold">${result.error}</p>
-        ${result.needsWaiver ? '<button onclick="navigateTo(\'members\')" class="btn btn-primary mt-4">Complete Waiver</button>' : ''}
+        ${result.needsWaiver && result.member ? `<button onclick="openWaiverFlow('${result.member.id}')" class="btn btn-primary mt-4">Complete Waiver</button>` : ''}
         ${result.needsPass ? '<button onclick="navigateTo(\'pos\')" class="btn btn-primary mt-4">Purchase Pass</button>' : ''}
       </div>
     `;

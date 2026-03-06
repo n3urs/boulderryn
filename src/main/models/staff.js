@@ -22,13 +22,26 @@ function hashPin(pin) {
   return crypto.createHash('sha256').update(pin).digest('hex');
 }
 
+// Role display names
+const ROLE_DISPLAY_NAMES = {
+  centre_assistant: 'Centre Assistant',
+  duty_manager: 'Duty Manager',
+  setter: 'Route Setter',
+  tech_lead: 'Tech Lead',
+  owner: 'Owner',
+};
+
+function getRoleDisplayName(role) {
+  return ROLE_DISPLAY_NAMES[role] || role;
+}
+
 const DEFAULT_PERMISSIONS = {
-  desk: {
+  centre_assistant: {
     checkin: true, pos: true, members_view: true, members_edit: false,
     events_view: true, events_edit: false, routes_view: true, routes_edit: false,
     analytics: false, settings: false, staff: false,
   },
-  manager: {
+  duty_manager: {
     checkin: true, pos: true, members_view: true, members_edit: true,
     events_view: true, events_edit: true, routes_view: true, routes_edit: true,
     analytics: true, settings: false, staff: false,
@@ -38,7 +51,7 @@ const DEFAULT_PERMISSIONS = {
     events_view: true, events_edit: false, routes_view: true, routes_edit: true,
     analytics: false, settings: false, staff: false,
   },
-  admin: {
+  tech_lead: {
     checkin: true, pos: true, members_view: true, members_edit: true,
     events_view: true, events_edit: true, routes_view: true, routes_edit: true,
     analytics: true, settings: true, staff: true,
@@ -54,8 +67,8 @@ const Staff = {
   create(data) {
     const db = getDb();
     const id = uuidv4();
-    const role = data.role || 'desk';
-    const permissions = data.permissions || DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.desk;
+    const role = data.role || 'centre_assistant';
+    const permissions = data.permissions || DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.centre_assistant;
 
     db.prepare(`
       INSERT INTO staff (id, first_name, last_name, email, phone, role, pin_hash, password_hash, permissions_json, is_active)
@@ -83,9 +96,19 @@ const Staff = {
 
   list(activeOnly = true) {
     const sql = activeOnly
-      ? 'SELECT id, first_name, last_name, email, phone, role, is_active, created_at FROM staff WHERE is_active = 1 ORDER BY role, last_name'
-      : 'SELECT id, first_name, last_name, email, phone, role, is_active, created_at FROM staff ORDER BY role, last_name';
-    return getDb().prepare(sql).all();
+      ? 'SELECT id, first_name, last_name, email, phone, role, is_active, permissions_json, created_at FROM staff WHERE is_active = 1 ORDER BY role, last_name'
+      : 'SELECT id, first_name, last_name, email, phone, role, is_active, permissions_json, created_at FROM staff ORDER BY role, last_name';
+    const rows = getDb().prepare(sql).all();
+    return rows.map(r => {
+      r.permissions = JSON.parse(r.permissions_json || '{}');
+      delete r.permissions_json;
+      return r;
+    });
+  },
+
+  count() {
+    const row = getDb().prepare('SELECT COUNT(*) as cnt FROM staff').get();
+    return row ? row.cnt : 0;
   },
 
   update(id, data) {
@@ -100,6 +123,13 @@ const Staff = {
     if (data.pin) { updates.push('pin_hash = @pin_hash'); params.pin_hash = hashPin(data.pin); }
     if (data.password) { updates.push('password_hash = @password_hash'); params.password_hash = hashPassword(data.password); }
     if (data.permissions) { updates.push('permissions_json = @permissions_json'); params.permissions_json = JSON.stringify(data.permissions); }
+
+    // If role changed and no explicit permissions, update permissions to role defaults
+    if (data.role && !data.permissions) {
+      const newPerms = DEFAULT_PERMISSIONS[data.role] || DEFAULT_PERMISSIONS.centre_assistant;
+      updates.push('permissions_json = @permissions_json');
+      params.permissions_json = JSON.stringify(newPerms);
+    }
 
     if (updates.length) db.prepare(`UPDATE staff SET ${updates.join(', ')} WHERE id = @id`).run(params);
     return this.getById(id);
@@ -147,12 +177,34 @@ const Staff = {
   hasPermission(staffId, permission) {
     const staff = this.getById(staffId);
     if (!staff) return false;
-    if (staff.role === 'owner' || staff.role === 'admin') return true;
+    if (staff.role === 'owner' || staff.role === 'tech_lead') return true;
     return !!staff.permissions[permission];
   },
 
   getDefaultPermissions(role) {
-    return DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.desk;
+    return DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.centre_assistant;
+  },
+
+  getRoleDisplayName,
+  ROLE_DISPLAY_NAMES,
+
+  /**
+   * Seed default owner — only works if no staff exist
+   */
+  seedOwner() {
+    const count = this.count();
+    if (count > 0) return { created: false, message: 'Staff already exist' };
+
+    const owner = this.create({
+      first_name: 'Oscar',
+      last_name: 'Sullivan',
+      email: 'oscar@sullivanltd.co.uk',
+      role: 'owner',
+      pin: '1234',
+      password: 'boulderryn2024',
+    });
+
+    return { created: true, staff: owner };
   },
 
   // ---- Staff Rota ----
@@ -191,7 +243,7 @@ const Staff = {
     return this.getShifts({ dateFrom: startDate, dateTo: end.toISOString().split('T')[0] });
   },
 
-  // ---- Audit Log (using transactions table for now, lightweight) ----
+  // ---- Audit Log ----
 
   getAuditTrail({ staffId, dateFrom, dateTo, limit = 50 } = {}) {
     const db = getDb();

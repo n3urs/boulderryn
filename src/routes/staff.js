@@ -1,6 +1,21 @@
 const router = require('express').Router();
 const Staff = require('../main/models/staff');
 
+// Seed default owner (first run only)
+router.post('/seed-owner', (req, res, next) => {
+  try { res.json(Staff.seedOwner()); } catch (e) { next(e); }
+});
+
+// Get staff count (for login screen to decide PIN vs first-run)
+router.get('/count', (req, res, next) => {
+  try { res.json({ count: Staff.count() }); } catch (e) { next(e); }
+});
+
+// Get default permissions for a role
+router.get('/default-permissions/:role', (req, res, next) => {
+  try { res.json(Staff.getDefaultPermissions(req.params.role)); } catch (e) { next(e); }
+});
+
 router.post('/', (req, res, next) => {
   try { res.json(Staff.create(req.body)); } catch (e) { next(e); }
 });
