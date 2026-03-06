@@ -1,5 +1,7 @@
 const router = require('express').Router();
+const { v4: uuidv4 } = require('uuid');
 const Member = require('../main/models/member');
+const { getDb } = require('../main/database/db');
 
 router.post('/', (req, res, next) => {
   try { res.json(Member.create(req.body)); } catch (e) { next(e); }
@@ -39,6 +41,88 @@ router.get('/:id', (req, res, next) => {
 
 router.get('/:id/with-pass-status', (req, res, next) => {
   try { res.json(Member.getWithPassStatus(req.params.id) || null); } catch (e) { next(e); }
+});
+
+// Staff comments
+router.get('/:id/comments', (req, res, next) => {
+  try {
+    const db = getDb();
+    const comments = db.prepare(`
+      SELECT * FROM staff_comments WHERE member_id = ? ORDER BY created_at DESC
+    `).all(req.params.id);
+    res.json(comments);
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/comments', (req, res, next) => {
+  try {
+    const db = getDb();
+    const id = uuidv4();
+    db.prepare(`
+      INSERT INTO staff_comments (id, member_id, staff_name, comment) VALUES (?, ?, ?, ?)
+    `).run(id, req.params.id, req.body.staff_name, req.body.comment);
+    const comment = db.prepare('SELECT * FROM staff_comments WHERE id = ?').get(id);
+    res.json(comment);
+  } catch (e) { next(e); }
+});
+
+// Validate registration fee
+router.post('/:id/validate-registration', (req, res, next) => {
+  try {
+    const db = getDb();
+    db.prepare("UPDATE members SET registration_fee_paid = 1, updated_at = datetime('now') WHERE id = ?")
+      .run(req.params.id);
+    res.json({ success: true });
+  } catch (e) { next(e); }
+});
+
+// Visit history
+router.get('/:id/visits', (req, res, next) => {
+  try {
+    const db = getDb();
+    const visits = db.prepare(`
+      SELECT ci.*, mp.id as pass_id, pt.name as pass_name
+      FROM check_ins ci
+      LEFT JOIN member_passes mp ON ci.member_pass_id = mp.id
+      LEFT JOIN pass_types pt ON mp.pass_type_id = pt.id
+      WHERE ci.member_id = ?
+      ORDER BY ci.checked_in_at DESC
+      LIMIT 100
+    `).all(req.params.id);
+    res.json(visits);
+  } catch (e) { next(e); }
+});
+
+// Transaction history
+router.get('/:id/transactions', (req, res, next) => {
+  try {
+    const db = getDb();
+    const transactions = db.prepare(`
+      SELECT t.*, 
+        (SELECT GROUP_CONCAT(ti.description, ', ') FROM transaction_items ti WHERE ti.transaction_id = t.id) as items_summary
+      FROM transactions t
+      WHERE t.member_id = ?
+      ORDER BY t.created_at DESC
+      LIMIT 100
+    `).all(req.params.id);
+    res.json(transactions);
+  } catch (e) { next(e); }
+});
+
+// Event history
+router.get('/:id/events', (req, res, next) => {
+  try {
+    const db = getDb();
+    const events = db.prepare(`
+      SELECT ee.*, e.name as event_name, e.starts_at, e.ends_at, e.status as event_status
+      FROM event_enrolments ee
+      JOIN events e ON ee.event_id = e.id
+      WHERE ee.member_id = ?
+      ORDER BY e.starts_at DESC
+      LIMIT 100
+    `).all(req.params.id);
+    res.json(events);
+  } catch (e) { next(e); }
 });
 
 router.put('/:id', (req, res, next) => {

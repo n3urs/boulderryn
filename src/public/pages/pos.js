@@ -1,126 +1,216 @@
 /**
- * POS Page — Point of Sale interface (Web Version)
+ * POS Page — Point of Sale interface (Beta-style overhaul)
+ * Dark sidebar, category grid, checkout panel
  */
 
 let posCart = [];
 let posSelectedMember = null;
+let posSelectedCategory = null;
+let posClock = null;
 
 async function loadPOS() {
   const el = document.getElementById('page-pos');
 
   el.innerHTML = `
-    <div class="flex gap-4 h-[calc(100vh-7rem)]">
-      <!-- Left: Product Grid -->
-      <div class="flex-1 flex flex-col overflow-hidden" style="min-width: 0;">
-        <div class="flex justify-between items-center mb-4 flex-shrink-0">
-          <h2 class="text-2xl font-bold text-gray-900 whitespace-nowrap">Point of Sale</h2>
-          <div class="flex gap-2 flex-shrink-0">
-            <button onclick="showAddProductModal()" class="btn btn-sm btn-secondary">+ Add Product</button>
-            <button onclick="showDailySummaryModal()" class="btn btn-sm btn-secondary">End of Day</button>
+    <div class="flex h-[calc(100vh-0rem)]">
+      <!-- Left: Categories + Products -->
+      <div class="flex-1 flex flex-col bg-gray-100 overflow-hidden">
+        <!-- Category Grid -->
+        <div id="pos-category-grid" class="p-4 flex-shrink-0">
+          <div class="grid grid-cols-5 gap-3" id="pos-categories-inner"></div>
+        </div>
+
+        <!-- Product Grid -->
+        <div class="flex-1 overflow-y-auto px-4 pb-4">
+          <div id="pos-product-grid" class="grid grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+            <p class="text-gray-400 text-center col-span-full py-12 text-sm">Select a category above</p>
           </div>
         </div>
 
-        <!-- Category tabs -->
-        <div id="pos-category-tabs" class="flex gap-2 mb-4 overflow-x-auto flex-shrink-0"></div>
-
-        <!-- Product grid -->
-        <div id="pos-product-grid" class="grid grid-cols-3 xl:grid-cols-4 gap-2 overflow-y-auto flex-1"></div>
-      </div>
-
-      <!-- Right: Cart -->
-      <div class="w-80 flex flex-col bg-white border border-gray-200 rounded-xl" style="flex-shrink: 0;">
-        <!-- Member selection -->
-        <div class="p-4 border-b border-gray-100">
-          <div class="flex gap-2">
-            <input type="text" id="pos-member-search" class="form-input text-sm flex-1"
-              placeholder="Link member (name/QR)..." onkeydown="if(event.key==='Enter')posSearchMember()">
-            <button onclick="posSearchMember()" class="btn btn-sm btn-secondary">Find</button>
-          </div>
-          <div id="pos-member-display" class="mt-2 text-sm"></div>
-        </div>
-
-        <!-- Cart items -->
-        <div id="pos-cart-items" class="flex-1 overflow-y-auto p-4">
-          <p class="text-gray-400 text-center text-sm py-8">Cart is empty</p>
-        </div>
-
-        <!-- Cart total & pay -->
-        <div class="border-t border-gray-200 p-4">
-          <div class="flex justify-between items-center mb-4">
-            <span class="text-lg font-semibold">Total</span>
-            <span id="pos-cart-total" class="text-2xl font-bold">£0.00</span>
-          </div>
-          <div class="flex gap-2">
-            <button onclick="posPayCard()" class="btn btn-primary btn-lg flex-1" id="pos-pay-btn" disabled>
-              Pay — Card
+        <!-- Bottom Bar -->
+        <div class="bg-white border-t border-gray-200 px-4 py-2 flex items-center justify-between flex-shrink-0">
+          <div class="flex items-center gap-2">
+            <button onclick="posProductSearch()" class="w-10 h-10 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition" title="Search products">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </button>
+            <button onclick="posQuickCheckIn()" class="w-10 h-10 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition" title="Quick check-in">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
             </button>
           </div>
-          <div class="flex gap-2 mt-2">
-            <button onclick="posPayGiftCard()" class="btn btn-sm btn-secondary flex-1">Gift Card</button>
-            <button onclick="posClearCart()" class="btn btn-sm btn-danger">Clear</button>
+          <div class="flex items-center gap-2">
+            <button onclick="posLinkProfile()" class="w-10 h-10 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition" title="Link member profile">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Checkout Sidebar -->
+      <div class="w-80 xl:w-96 bg-slate-800 text-white flex flex-col flex-shrink-0">
+        <!-- Date/Time -->
+        <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+          <div>
+            <div id="pos-date" class="text-xs text-slate-400"></div>
+            <div id="pos-time" class="text-lg font-bold font-mono"></div>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+            <button onclick="posAddCustomItem()" class="w-8 h-8 rounded bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-300" title="Add custom item">+</button>
+          </div>
+        </div>
+
+        <!-- Member / Warning -->
+        <div id="pos-member-section" class="px-4 py-2 border-b border-slate-700">
+          <div id="pos-member-display">
+            <div class="bg-red-600/90 rounded-lg px-3 py-2 text-center animate-pulse">
+              <p class="text-sm font-bold">WARNING!!! No Profile Linked</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cart Items -->
+        <div id="pos-cart-items" class="flex-1 overflow-y-auto px-4 py-2">
+          <p class="text-slate-500 text-center text-sm py-8">Cart is empty</p>
+        </div>
+
+        <!-- Totals -->
+        <div class="px-4 py-3 border-t border-slate-700">
+          <div class="flex justify-between text-sm text-slate-400 mb-1">
+            <span>Subtotal</span>
+            <span id="pos-subtotal">£0.00</span>
+          </div>
+          <div class="flex justify-between text-sm text-slate-400 mb-2">
+            <span>Tax (0%)</span>
+            <span>£0.00</span>
+          </div>
+          <div class="flex justify-between text-xl font-bold mb-3">
+            <span>TOTAL</span>
+            <span id="pos-cart-total">£0.00</span>
+          </div>
+
+          <!-- Discounts placeholder -->
+          <div class="text-xs text-slate-500 uppercase tracking-wider mb-3">Discounts</div>
+
+          <!-- Payment buttons -->
+          <div class="grid grid-cols-3 gap-2 mb-3">
+            <button onclick="posPayMethod('dojo_card')" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2.5 text-sm font-bold flex flex-col items-center gap-1 transition" id="pos-pay-dojo">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+              Dojo
+            </button>
+            <button onclick="posPayMethod('voucher')" class="bg-purple-600 hover:bg-purple-700 text-white rounded-lg py-2.5 text-sm font-bold flex flex-col items-center gap-1 transition">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>
+              Voucher
+            </button>
+            <button onclick="posPayMethod('other')" class="bg-slate-600 hover:bg-slate-500 text-white rounded-lg py-2.5 text-sm font-bold flex flex-col items-center gap-1 transition">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              Other
+            </button>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="posCancelTx()" class="bg-red-700 hover:bg-red-600 text-white rounded-lg py-2 text-xs font-bold transition">Cancel Tx</button>
+            <button onclick="posNewTx()" class="bg-blue-700 hover:bg-blue-600 text-white rounded-lg py-2 text-xs font-bold transition">New Tx</button>
+            <button onclick="showDailySummaryModal()" class="bg-slate-600 hover:bg-slate-500 text-white rounded-lg py-2 text-xs font-bold transition">Show Totals</button>
           </div>
         </div>
       </div>
     </div>
   `;
 
+  // Start clock
+  updatePosClock();
+  posClock = setInterval(updatePosClock, 1000);
+
   await posLoadProducts();
+  posRenderCart();
 }
+
+function updatePosClock() {
+  const now = new Date();
+  const dateEl = document.getElementById('pos-date');
+  const timeEl = document.getElementById('pos-time');
+  if (dateEl) dateEl.textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  if (timeEl) timeEl.textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+// Category colours for visual distinction
+const categoryColours = {
+  'cat_cold_drinks': 'from-cyan-500 to-cyan-600',
+  'cat_day_entry': 'from-blue-500 to-blue-600',
+  'cat_events': 'from-violet-500 to-violet-600',
+  'cat_food': 'from-amber-500 to-amber-600',
+  'cat_hire': 'from-emerald-500 to-emerald-600',
+  'cat_hot_drinks': 'from-orange-500 to-orange-600',
+  'cat_membership': 'from-indigo-500 to-indigo-600',
+  'cat_prepaid': 'from-teal-500 to-teal-600',
+  'cat_products': 'from-slate-500 to-slate-600',
+};
 
 async function posLoadProducts() {
   const grouped = await api('GET', '/api/products/grouped');
-  const tabsEl = document.getElementById('pos-category-tabs');
-  const gridEl = document.getElementById('pos-product-grid');
+  const categoriesInner = document.getElementById('pos-categories-inner');
 
   if (grouped.length === 0) {
-    tabsEl.innerHTML = '';
-    gridEl.innerHTML = '<p class="text-gray-400 text-center col-span-full py-8">No products yet. Click "+ Add Product" to get started.</p>';
+    categoriesInner.innerHTML = '<p class="text-gray-400 text-center col-span-full py-8">No products yet</p>';
     return;
   }
-
-  tabsEl.innerHTML = `
-    <button class="pos-tab active" onclick="posFilterCategory(null, this)">All</button>
-    ${grouped.map(g => `
-      <button class="pos-tab" onclick="posFilterCategory('${g.id}', this)">${g.name}</button>
-    `).join('')}
-  `;
 
   window._posProducts = grouped;
-  posRenderGrid(null);
-}
 
-function posRenderGrid(categoryId) {
-  const gridEl = document.getElementById('pos-product-grid');
-  let products = [];
-
-  if (categoryId) {
-    const cat = window._posProducts.find(g => g.id === categoryId);
-    if (cat) products = cat.products;
-  } else {
-    window._posProducts.forEach(g => products.push(...g.products));
-  }
-
-  if (products.length === 0) {
-    gridEl.innerHTML = '<p class="text-gray-400 text-center col-span-full py-8">No products in this category.</p>';
-    return;
-  }
-
-  gridEl.innerHTML = products.map(p => {
-    const outOfStock = p.stock_enforce_limit && p.stock_count !== null && p.stock_count <= 0;
+  categoriesInner.innerHTML = grouped.map(g => {
+    const gradient = categoryColours[g.id] || 'from-gray-500 to-gray-600';
     return `
-      <button onclick="posAddToCart('${p.id}')" class="pos-product-btn ${outOfStock ? 'opacity-40 cursor-not-allowed' : ''}" ${outOfStock ? 'disabled' : ''}>
-        <span class="font-semibold text-sm leading-tight">${p.name}</span>
-        <span class="text-blue-600 font-bold mt-1">£${p.price.toFixed(2)}</span>
-        ${p.stock_count !== null ? `<span class="text-xs text-gray-400">${p.stock_count} left</span>` : ''}
+      <button onclick="posSelectCategory('${g.id}', this)" 
+              class="pos-category-btn bg-gradient-to-br ${gradient} text-white rounded-xl p-3 text-left hover:shadow-lg hover:scale-[1.02] transition-all relative overflow-hidden"
+              data-cat="${g.id}">
+        <div class="text-2xl mb-1">${g.icon || '📦'}</div>
+        <div class="font-bold text-sm leading-tight">${g.name}</div>
+        <div class="text-xs opacity-75">${g.products.length} items</div>
       </button>
     `;
   }).join('');
 }
 
-function posFilterCategory(categoryId, btn) {
-  document.querySelectorAll('.pos-tab').forEach(t => t.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  posRenderGrid(categoryId);
+function posSelectCategory(categoryId, btn) {
+  posSelectedCategory = categoryId;
+
+  // Highlight active category
+  document.querySelectorAll('.pos-category-btn').forEach(b => {
+    b.classList.remove('ring-4', 'ring-white', 'ring-offset-2');
+  });
+  if (btn) {
+    btn.classList.add('ring-4', 'ring-white', 'ring-offset-2');
+  }
+
+  posRenderProductGrid(categoryId);
+}
+
+function posRenderProductGrid(categoryId) {
+  const gridEl = document.getElementById('pos-product-grid');
+  const cat = window._posProducts.find(g => g.id === categoryId);
+  if (!cat || cat.products.length === 0) {
+    gridEl.innerHTML = '<p class="text-gray-400 text-center col-span-full py-8 text-sm">No products in this category</p>';
+    return;
+  }
+
+  gridEl.innerHTML = cat.products.map(p => {
+    const outOfStock = p.stock_enforce_limit && p.stock_count !== null && p.stock_count <= 0;
+    return `
+      <button onclick="posAddToCart('${p.id}')" 
+              class="pos-product-card bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition ${outOfStock ? 'opacity-40' : ''}" 
+              ${outOfStock ? 'disabled' : ''}>
+        <div class="bg-blue-600 px-3 py-2">
+          <span class="text-white text-sm font-bold leading-tight block truncate">${p.name}</span>
+        </div>
+        <div class="px-3 py-2">
+          <span class="text-blue-700 font-bold text-lg">£${p.price.toFixed(2)}</span>
+          ${p.product_code ? `<span class="text-gray-400 text-xs block mt-0.5">${p.product_code}</span>` : ''}
+          ${p.stock_count !== null ? `<span class="text-xs text-gray-400">${p.stock_count} in stock</span>` : ''}
+        </div>
+      </button>
+    `;
+  }).join('');
 }
 
 async function posAddToCart(productId) {
@@ -130,6 +220,15 @@ async function posAddToCart(productId) {
   if (product.stock_enforce_limit && product.stock_count !== null && product.stock_count <= 0) {
     showToast('Out of stock', 'error');
     return;
+  }
+
+  // Check if Day Entry product and no member linked
+  if (product.category_name === 'Day Entry' && !posSelectedMember) {
+    const proceed = confirm('No member linked. Day Entry products should be linked to a member for check-in.\n\nLink a member first?');
+    if (proceed) {
+      posLinkProfile();
+      return;
+    }
   }
 
   const existing = posCart.find(item => item.product_id === productId);
@@ -166,95 +265,158 @@ function posUpdateQuantity(index, delta) {
 
 function posRenderCart() {
   const itemsEl = document.getElementById('pos-cart-items');
+  const subtotalEl = document.getElementById('pos-subtotal');
   const totalEl = document.getElementById('pos-cart-total');
-  const payBtn = document.getElementById('pos-pay-btn');
+
+  if (!itemsEl) return;
 
   if (posCart.length === 0) {
-    itemsEl.innerHTML = '<p class="text-gray-400 text-center text-sm py-8">Cart is empty</p>';
+    itemsEl.innerHTML = '<p class="text-slate-500 text-center text-sm py-8">Cart is empty</p>';
+    subtotalEl.textContent = '£0.00';
     totalEl.textContent = '£0.00';
-    payBtn.disabled = true;
     return;
   }
 
   const total = posCart.reduce((sum, item) => sum + item.total_price, 0);
 
   itemsEl.innerHTML = posCart.map((item, i) => `
-    <div class="flex items-center justify-between py-2 border-b border-gray-50">
+    <div class="flex items-center justify-between py-2 border-b border-slate-700/50">
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium truncate">${item.description}</p>
-        <p class="text-xs text-gray-400">£${item.unit_price.toFixed(2)} each</p>
+        <p class="text-sm font-medium text-white truncate">${item.description}</p>
+        <p class="text-xs text-slate-400">£${item.unit_price.toFixed(2)} each</p>
       </div>
-      <div class="flex items-center gap-2 ml-2">
-        <button onclick="posUpdateQuantity(${i}, -1)" class="w-6 h-6 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 text-xs font-bold">−</button>
-        <span class="text-sm font-semibold w-6 text-center">${item.quantity}</span>
-        <button onclick="posUpdateQuantity(${i}, 1)" class="w-6 h-6 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 text-xs font-bold">+</button>
-        <span class="text-sm font-semibold w-14 text-right">£${item.total_price.toFixed(2)}</span>
-        <button onclick="posRemoveFromCart(${i})" class="text-red-400 hover:text-red-600 ml-1">
+      <div class="flex items-center gap-1.5 ml-2">
+        <button onclick="posUpdateQuantity(${i}, -1)" class="w-6 h-6 rounded bg-slate-700 text-slate-300 hover:bg-slate-600 text-xs font-bold flex items-center justify-center">−</button>
+        <span class="text-sm font-bold w-5 text-center">${item.quantity}</span>
+        <button onclick="posUpdateQuantity(${i}, 1)" class="w-6 h-6 rounded bg-slate-700 text-slate-300 hover:bg-slate-600 text-xs font-bold flex items-center justify-center">+</button>
+        <span class="text-sm font-bold w-14 text-right">£${item.total_price.toFixed(2)}</span>
+        <button onclick="posRemoveFromCart(${i})" class="text-slate-500 hover:text-red-400 ml-1">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
     </div>
   `).join('');
 
+  subtotalEl.textContent = `£${total.toFixed(2)}`;
   totalEl.textContent = `£${total.toFixed(2)}`;
-  payBtn.textContent = `Pay — Card (£${total.toFixed(2)})`;
-  payBtn.disabled = false;
 }
 
-async function posSearchMember() {
-  const query = document.getElementById('pos-member-search').value.trim();
-  if (!query) return;
+// Member search/link for POS
+function posLinkProfile() {
+  const name = prompt('Enter member name or QR code:');
+  if (!name) return;
+  posSearchAndLink(name);
+}
 
-  if (query.startsWith('BR-')) {
-    const m = await api('GET', `/api/members/by-qr/${encodeURIComponent(query)}`);
-    if (m) { posSelectMember(m); return; }
+async function posSearchAndLink(query) {
+  try {
+    if (query.startsWith('BR-')) {
+      const m = await api('GET', `/api/members/by-qr/${encodeURIComponent(query)}`);
+      if (m) { posSelectMember(m); return; }
+    }
+
+    const results = await api('GET', `/api/members/search?q=${encodeURIComponent(query)}&limit=5`);
+
+    if (results.length === 0) {
+      showToast('No member found', 'error');
+      return;
+    }
+
+    if (results.length === 1) {
+      posSelectMember(results[0]);
+      return;
+    }
+
+    // Multiple results — show selection in a simple dialog
+    const selected = results[0]; // For simplicity, take first match
+    // Actually, let's show a proper selection
+    const names = results.map((m, i) => `${i + 1}. ${m.first_name} ${m.last_name} (${m.email || 'no email'})`).join('\n');
+    const choice = prompt(`Multiple members found:\n${names}\n\nEnter number (1-${results.length}):`);
+    const idx = parseInt(choice) - 1;
+    if (idx >= 0 && idx < results.length) {
+      posSelectMember(results[idx]);
+    }
+  } catch (err) {
+    showToast('Search failed: ' + err.message, 'error');
   }
-
-  const results = await api('GET', `/api/members/search?q=${encodeURIComponent(query)}&limit=5`);
-  const displayEl = document.getElementById('pos-member-display');
-
-  if (results.length === 0) {
-    displayEl.innerHTML = '<span class="text-red-400">No member found</span>';
-    return;
-  }
-
-  if (results.length === 1) {
-    posSelectMember(results[0]);
-    return;
-  }
-
-  displayEl.innerHTML = results.map(m => `
-    <button onclick='posSelectMember(${JSON.stringify(m).replace(/'/g, "&#39;")})' class="block w-full text-left px-2 py-1 hover:bg-blue-50 rounded text-sm">
-      ${m.first_name} ${m.last_name} <span class="text-gray-400">${m.email || ''}</span>
-    </button>
-  `).join('');
 }
 
 function posSelectMember(member) {
   posSelectedMember = member;
-  document.getElementById('pos-member-search').value = '';
-  document.getElementById('pos-member-display').innerHTML = `
-    <div class="flex items-center justify-between bg-blue-50 rounded-lg px-3 py-2">
-      <span class="font-medium text-sm">${member.first_name} ${member.last_name}</span>
-      <button onclick="posClearMember()" class="text-gray-400 hover:text-red-500 text-xs">Remove</button>
+  const displayEl = document.getElementById('pos-member-display');
+  const initials = getInitials(member.first_name, member.last_name).toUpperCase();
+  const colour = nameToColour(member.first_name + member.last_name);
+  const regPaid = member.registration_fee_paid === 1;
+
+  displayEl.innerHTML = `
+    <div class="flex items-center gap-3 bg-slate-700 rounded-lg px-3 py-2">
+      <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0" style="background:${colour}">${initials}</div>
+      <div class="flex-1 min-w-0">
+        <span class="font-bold text-sm text-white block truncate">${member.first_name} ${member.last_name}</span>
+        ${!regPaid ? '<span class="text-xs text-red-400">Reg fee not paid</span>' : ''}
+      </div>
+      <button onclick="posClearMember()" class="text-slate-400 hover:text-red-400 flex-shrink-0" title="Remove">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
     </div>
   `;
 }
 
 function posClearMember() {
   posSelectedMember = null;
-  document.getElementById('pos-member-display').innerHTML = '';
+  const displayEl = document.getElementById('pos-member-display');
+  if (displayEl) {
+    displayEl.innerHTML = `
+      <div class="bg-red-600/90 rounded-lg px-3 py-2 text-center animate-pulse">
+        <p class="text-sm font-bold">WARNING!!! No Profile Linked</p>
+      </div>
+    `;
+  }
 }
 
-async function posPayCard() {
-  if (posCart.length === 0) return;
+async function posPayMethod(method) {
+  if (posCart.length === 0) {
+    showToast('Cart is empty', 'error');
+    return;
+  }
 
   const total = posCart.reduce((sum, item) => sum + item.total_price, 0);
 
+  if (method === 'voucher') {
+    const code = prompt('Enter voucher / gift card code:');
+    if (!code) return;
+
+    try {
+      const card = await api('GET', `/api/giftcards/by-code/${encodeURIComponent(code)}`);
+      if (!card) { showToast('Card not found', 'error'); return; }
+      if (card.current_balance < total) {
+        showToast(`Insufficient balance (£${card.current_balance.toFixed(2)})`, 'error');
+        return;
+      }
+      // Process with gift card
+      const txn = await api('POST', '/api/transactions', {
+        member_id: posSelectedMember ? posSelectedMember.id : null,
+        payment_method: 'gift_card',
+        payment_status: 'completed',
+        payment_reference: code,
+        items: posCart,
+      });
+      await api('POST', '/api/giftcards/redeem', { code, amount: total, transactionId: txn.id });
+      showToast(`Paid £${total.toFixed(2)} with voucher`, 'success');
+      posNewTx();
+      return;
+    } catch (err) {
+      showToast('Voucher error: ' + err.message, 'error');
+      return;
+    }
+  }
+
+  // Dojo (card) or Other
   try {
+    const paymentMethod = method === 'dojo_card' ? 'dojo_card' : method;
     const txn = await api('POST', '/api/transactions', {
       member_id: posSelectedMember ? posSelectedMember.id : null,
-      payment_method: 'dojo_card',
+      payment_method: paymentMethod,
       payment_status: 'completed',
       items: posCart,
       notes: null,
@@ -264,194 +426,202 @@ async function posPayCard() {
 
     if (posSelectedMember && posSelectedMember.email) {
       api('POST', `/api/transactions/${txn.id}/send-receipt`).then(r => {
-        if (r.success) showToast('Receipt emailed', 'info');
-      });
+        if (r && r.success) showToast('Receipt emailed', 'info');
+      }).catch(() => {});
     }
 
-    posClearCart();
-    await posLoadProducts();
+    posNewTx();
+    await posLoadProducts(); // Refresh stock
   } catch (err) {
     showToast('Payment failed: ' + err.message, 'error');
   }
 }
 
-async function posPayGiftCard() {
-  if (posCart.length === 0) return;
-  const total = posCart.reduce((sum, item) => sum + item.total_price, 0);
-
-  const code = prompt('Enter gift card code:');
-  if (!code) return;
-
-  try {
-    const card = await api('GET', `/api/giftcards/by-code/${encodeURIComponent(code)}`);
-    if (!card) { showToast('Gift card not found', 'error'); return; }
-    if (card.current_balance < total) {
-      showToast(`Insufficient balance (£${card.current_balance.toFixed(2)} available)`, 'error');
-      return;
-    }
-
-    const txn = await api('POST', '/api/transactions', {
-      member_id: posSelectedMember ? posSelectedMember.id : null,
-      payment_method: 'gift_card',
-      payment_status: 'completed',
-      payment_reference: code,
-      items: posCart,
-    });
-
-    await api('POST', '/api/giftcards/redeem', { code, amount: total, transactionId: txn.id });
-    showToast(`Paid with gift card — £${total.toFixed(2)} (balance: £${(card.current_balance - total).toFixed(2)})`, 'success');
-    posClearCart();
-    await posLoadProducts();
-  } catch (err) {
-    showToast('Gift card payment failed: ' + err.message, 'error');
+function posCancelTx() {
+  if (posCart.length === 0 && !posSelectedMember) return;
+  if (confirm('Cancel this transaction?')) {
+    posNewTx();
   }
 }
 
-function posClearCart() {
+function posNewTx() {
   posCart = [];
   posSelectedMember = null;
-  document.getElementById('pos-member-display').innerHTML = '';
+  const displayEl = document.getElementById('pos-member-display');
+  if (displayEl) {
+    displayEl.innerHTML = `
+      <div class="bg-red-600/90 rounded-lg px-3 py-2 text-center animate-pulse">
+        <p class="text-sm font-bold">WARNING!!! No Profile Linked</p>
+      </div>
+    `;
+  }
+  posRenderCart();
+}
+
+function posProductSearch() {
+  const query = prompt('Search products:');
+  if (!query || query.length < 2) return;
+
+  // Search through all loaded products
+  if (!window._posProducts) return;
+  const matches = [];
+  window._posProducts.forEach(g => {
+    g.products.forEach(p => {
+      if (p.name.toLowerCase().includes(query.toLowerCase())) {
+        matches.push(p);
+      }
+    });
+  });
+
+  if (matches.length === 0) {
+    showToast('No products found', 'info');
+    return;
+  }
+
+  // Show matches in product grid
+  const gridEl = document.getElementById('pos-product-grid');
+  gridEl.innerHTML = `
+    <div class="col-span-full mb-2">
+      <span class="text-sm text-gray-500">${matches.length} results for "${query}"</span>
+      <button onclick="posRenderProductGrid(posSelectedCategory || window._posProducts[0]?.id)" class="text-blue-600 text-sm ml-2 hover:underline">Clear search</button>
+    </div>
+    ${matches.map(p => `
+      <button onclick="posAddToCart('${p.id}')" 
+              class="pos-product-card bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
+        <div class="bg-blue-600 px-3 py-2">
+          <span class="text-white text-sm font-bold leading-tight block truncate">${p.name}</span>
+        </div>
+        <div class="px-3 py-2">
+          <span class="text-blue-700 font-bold text-lg">£${p.price.toFixed(2)}</span>
+          ${p.product_code ? `<span class="text-gray-400 text-xs block mt-0.5">${p.product_code}</span>` : ''}
+        </div>
+      </button>
+    `).join('')}
+  `;
+}
+
+function posQuickCheckIn() {
+  const query = prompt('Check in - Enter member name or QR code:');
+  if (!query) return;
+  
+  (async () => {
+    try {
+      let memberId;
+      if (query.startsWith('BR-')) {
+        const m = await api('GET', `/api/members/by-qr/${encodeURIComponent(query)}`);
+        if (m) memberId = m.id;
+      } else {
+        const results = await api('GET', `/api/members/search?q=${encodeURIComponent(query)}&limit=1`);
+        if (results.length > 0) memberId = results[0].id;
+      }
+
+      if (!memberId) { showToast('Member not found', 'error'); return; }
+
+      const result = await api('POST', '/api/checkin/process', { memberId });
+      if (result.success) {
+        showToast(`${result.member.first_name} checked in`, 'success');
+        if (result.registrationWarning) {
+          showToast('REGISTRATION FEE NOT PAID', 'error');
+        }
+      } else {
+        showToast(result.error, 'error');
+      }
+    } catch (err) {
+      showToast('Check-in error: ' + err.message, 'error');
+    }
+  })();
+}
+
+function posAddCustomItem() {
+  const name = prompt('Custom item name:');
+  if (!name) return;
+  const priceStr = prompt('Price (£):');
+  if (!priceStr) return;
+  const price = parseFloat(priceStr);
+  if (isNaN(price) || price < 0) { showToast('Invalid price', 'error'); return; }
+
+  posCart.push({
+    product_id: null,
+    description: name,
+    unit_price: price,
+    quantity: 1,
+    total_price: price,
+  });
   posRenderCart();
 }
 
 async function showDailySummaryModal() {
-  const summary = await api('GET', '/api/transactions/daily-summary');
-
-  showModal(`
-    <div class="p-6">
-      <h3 class="text-xl font-bold mb-4">End of Day — ${summary.date}</h3>
-
-      <div class="grid grid-cols-3 gap-4 mb-6">
-        <div class="card">
-          <div class="card-header">Transactions</div>
-          <div class="card-value">${summary.totals.transaction_count}</div>
-        </div>
-        <div class="card">
-          <div class="card-header">Total Sales</div>
-          <div class="card-value">£${summary.totals.total_sales.toFixed(2)}</div>
-        </div>
-        <div class="card">
-          <div class="card-header">Net Total</div>
-          <div class="card-value">£${summary.totals.net_total.toFixed(2)}</div>
-        </div>
-      </div>
-
-      ${summary.totals.total_refunds > 0 ? `
-        <div class="bg-red-50 rounded-lg p-3 mb-4">
-          <span class="text-sm font-semibold text-red-800">Refunds: £${summary.totals.total_refunds.toFixed(2)}</span>
-        </div>
-      ` : ''}
-
-      <h4 class="font-semibold text-sm text-gray-500 uppercase mb-2">By Payment Method</h4>
-      <div class="space-y-2 mb-4">
-        ${summary.byMethod.map(m => `
-          <div class="flex justify-between items-center py-1">
-            <span class="text-sm">${m.payment_method === 'dojo_card' ? 'Card (Dojo)' : m.payment_method}</span>
-            <span class="font-semibold">£${m.net_total.toFixed(2)} <span class="text-gray-400 text-xs">(${m.transaction_count} txns)</span></span>
-          </div>
-        `).join('')}
-      </div>
-
-      ${summary.byCategory.length > 0 ? `
-        <h4 class="font-semibold text-sm text-gray-500 uppercase mb-2">By Category</h4>
-        <div class="space-y-2 mb-4">
-          ${summary.byCategory.map(c => `
-            <div class="flex justify-between items-center py-1">
-              <span class="text-sm">${c.category || 'Uncategorised'}</span>
-              <span class="font-semibold">£${c.total.toFixed(2)}</span>
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
-
-      ${summary.topProducts.length > 0 ? `
-        <h4 class="font-semibold text-sm text-gray-500 uppercase mb-2">Top Products</h4>
-        <div class="space-y-2">
-          ${summary.topProducts.map(p => `
-            <div class="flex justify-between items-center py-1">
-              <span class="text-sm">${p.description} <span class="text-gray-400">(x${p.qty})</span></span>
-              <span class="font-semibold">£${p.revenue.toFixed(2)}</span>
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
-
-      <div class="flex justify-end mt-6">
-        <button onclick="closeModal()" class="btn btn-secondary">Close</button>
-      </div>
-    </div>
-  `);
-}
-
-function showAddProductModal() {
-  showModal(`
-    <div class="p-6">
-      <h3 class="text-xl font-bold mb-4">Add Product</h3>
-      <form id="add-product-form" onsubmit="posCreateProduct(event)">
-        <div class="grid grid-cols-2 gap-4">
-          <div class="form-group col-span-2">
-            <label class="form-label">Product Name *</label>
-            <input type="text" name="name" class="form-input" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Price (£) *</label>
-            <input type="number" name="price" class="form-input" step="0.01" min="0" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Cost Price (£)</label>
-            <input type="number" name="cost_price" class="form-input" step="0.01" min="0">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Category</label>
-            <select name="category_id" class="form-select" id="product-category-select">
-              <option value="">None</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Initial Stock (blank = not tracked)</label>
-            <input type="number" name="stock_count" class="form-input" min="0">
-          </div>
-          <div class="form-group col-span-2">
-            <label class="form-label">Description</label>
-            <input type="text" name="description" class="form-input">
-          </div>
-        </div>
-        <div class="flex justify-end gap-2 mt-6">
-          <button type="button" onclick="closeModal()" class="btn btn-secondary">Cancel</button>
-          <button type="submit" class="btn btn-primary">Add Product</button>
-        </div>
-      </form>
-    </div>
-  `);
-
-  api('GET', '/api/products/categories').then(cats => {
-    const select = document.getElementById('product-category-select');
-    cats.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = c.name;
-      select.appendChild(opt);
-    });
-  });
-}
-
-async function posCreateProduct(e) {
-  e.preventDefault();
-  const form = document.getElementById('add-product-form');
-  const data = Object.fromEntries(new FormData(form));
-
-  data.price = parseFloat(data.price);
-  if (data.cost_price) data.cost_price = parseFloat(data.cost_price);
-  if (data.stock_count) data.stock_count = parseInt(data.stock_count);
-  else data.stock_count = null;
-  if (!data.category_id) data.category_id = null;
-
   try {
-    await api('POST', '/api/products', data);
-    closeModal();
-    showToast('Product added', 'success');
-    await posLoadProducts();
+    const summary = await api('GET', '/api/transactions/daily-summary');
+
+    // Reset modal width
+    document.getElementById('modal-content').className = 'bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto';
+
+    showModal(`
+      <div class="p-6">
+        <h3 class="text-xl font-bold mb-4">End of Day — ${summary.date}</h3>
+
+        <div class="grid grid-cols-3 gap-4 mb-6">
+          <div class="card">
+            <div class="card-header">Transactions</div>
+            <div class="card-value">${summary.totals.transaction_count}</div>
+          </div>
+          <div class="card">
+            <div class="card-header">Total Sales</div>
+            <div class="card-value">£${summary.totals.total_sales.toFixed(2)}</div>
+          </div>
+          <div class="card">
+            <div class="card-header">Net Total</div>
+            <div class="card-value">£${summary.totals.net_total.toFixed(2)}</div>
+          </div>
+        </div>
+
+        ${summary.totals.total_refunds > 0 ? `
+          <div class="bg-red-50 rounded-lg p-3 mb-4">
+            <span class="text-sm font-semibold text-red-800">Refunds: £${summary.totals.total_refunds.toFixed(2)}</span>
+          </div>
+        ` : ''}
+
+        <h4 class="font-semibold text-sm text-gray-500 uppercase mb-2">By Payment Method</h4>
+        <div class="space-y-2 mb-4">
+          ${summary.byMethod.map(m => `
+            <div class="flex justify-between items-center py-1">
+              <span class="text-sm">${m.payment_method === 'dojo_card' ? 'Card (Dojo)' : m.payment_method}</span>
+              <span class="font-semibold">£${m.net_total.toFixed(2)} <span class="text-gray-400 text-xs">(${m.transaction_count} txns)</span></span>
+            </div>
+          `).join('')}
+        </div>
+
+        ${summary.byCategory.length > 0 ? `
+          <h4 class="font-semibold text-sm text-gray-500 uppercase mb-2">By Category</h4>
+          <div class="space-y-2 mb-4">
+            ${summary.byCategory.map(c => `
+              <div class="flex justify-between items-center py-1">
+                <span class="text-sm">${c.category || 'Uncategorised'}</span>
+                <span class="font-semibold">£${c.total.toFixed(2)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+
+        ${summary.topProducts.length > 0 ? `
+          <h4 class="font-semibold text-sm text-gray-500 uppercase mb-2">Top Products</h4>
+          <div class="space-y-2">
+            ${summary.topProducts.map(p => `
+              <div class="flex justify-between items-center py-1">
+                <span class="text-sm">${p.description} <span class="text-gray-400">(x${p.qty})</span></span>
+                <span class="font-semibold">£${p.revenue.toFixed(2)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+
+        <div class="flex justify-end mt-6">
+          <button onclick="closeModal()" class="btn btn-secondary">Close</button>
+        </div>
+      </div>
+    `);
   } catch (err) {
-    showToast('Error: ' + err.message, 'error');
+    showToast('Error loading summary: ' + err.message, 'error');
   }
 }

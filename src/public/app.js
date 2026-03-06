@@ -1,6 +1,6 @@
 /**
  * BoulderRyn — Frontend Application (Web Version)
- * Uses fetch() to communicate with Express REST API
+ * Complete overhaul matching BETA gym software
  */
 
 // ============================================================
@@ -22,6 +22,111 @@ async function api(method, url, body = null) {
 }
 
 // ============================================================
+// Utility: Generate colour from name hash for initials circles
+// ============================================================
+
+function nameToColour(name) {
+  const colours = [
+    '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
+    '#EC4899', '#06B6D4', '#F97316', '#6366F1', '#14B8A6',
+    '#E11D48', '#0EA5E9', '#84CC16', '#A855F7', '#D946EF'
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colours[Math.abs(hash) % colours.length];
+}
+
+function getInitials(firstName, lastName) {
+  return ((firstName || '')[0] || '') + ((lastName || '')[0] || '');
+}
+
+function calculateAge(dob) {
+  if (!dob) return null;
+  const birth = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatDateTime(dateStr) {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// ============================================================
+// Member Card Component (reused across dashboard, members, search)
+// ============================================================
+
+function renderMemberCard(m, options = {}) {
+  const { showCheckin = true, compact = false } = options;
+  const initials = getInitials(m.first_name, m.last_name).toUpperCase();
+  const colour = nameToColour(m.first_name + m.last_name);
+  const age = calculateAge(m.date_of_birth);
+  const isUnder18 = age !== null && age < 18;
+  const regPaid = m.registration_fee_paid === 1;
+  const name = `${m.first_name} ${m.last_name}`.toUpperCase();
+
+  return `
+    <div class="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md hover:border-blue-300 transition cursor-pointer flex items-start gap-3"
+         onclick="openMemberProfile('${m.id}')">
+      <div class="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+           style="background:${colour}">
+        ${initials}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-sm text-gray-900 truncate">${name}</span>
+          ${!regPaid ? '<span class="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" title="Registration fee not paid">!</span>' : '<span class="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-white text-xs flex-shrink-0"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></span>'}
+        </div>
+        <p class="text-xs text-gray-500 truncate">${m.email || 'No email'}</p>
+        ${m.date_of_birth ? `
+          <p class="text-xs mt-0.5">
+            <span class="text-gray-400">${formatDate(m.date_of_birth)}</span>
+            ${age !== null ? `<span class="${isUnder18 ? 'text-blue-600 font-bold' : 'text-gray-500'} ml-1">(${age})</span>` : ''}
+          </p>
+        ` : ''}
+      </div>
+      ${showCheckin ? `
+        <button onclick="event.stopPropagation(); quickCheckIn('${m.id}')" 
+                class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 hover:bg-blue-100 flex items-center justify-center text-blue-600 transition"
+                title="Check in">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        </button>
+      ` : ''}
+    </div>
+  `;
+}
+
+async function quickCheckIn(memberId) {
+  try {
+    const result = await api('POST', '/api/checkin/process', { memberId });
+    if (result.success) {
+      showToast(`${result.member.first_name} checked in`, 'success');
+      if (result.registrationWarning) {
+        showToast('REGISTRATION FEE NOT PAID — Add £3.00 to next transaction', 'error');
+      }
+      // Refresh active visitors if on dashboard
+      if (document.getElementById('page-dashboard').classList.contains('active')) {
+        loadActiveVisitors();
+      }
+    } else {
+      showToast(result.error, 'error');
+    }
+  } catch (err) {
+    showToast('Check-in failed: ' + err.message, 'error');
+  }
+}
+
+// ============================================================
 // Navigation
 // ============================================================
 
@@ -40,6 +145,16 @@ function navigateTo(pageName) {
 
   const navLink = document.querySelector(`[data-page="${pageName}"]`);
   if (navLink) navLink.classList.add('active');
+
+  // Remove padding for POS page (full-bleed layout)
+  const container = document.getElementById('page-container');
+  if (pageName === 'pos') {
+    container.classList.remove('p-6');
+    container.classList.add('p-0');
+  } else {
+    container.classList.remove('p-0');
+    container.classList.add('p-6');
+  }
 
   loadPage(pageName);
 }
@@ -69,70 +184,185 @@ async function loadPage(pageName) {
 }
 
 // ============================================================
-// Dashboard
+// Dashboard (Visitors Page — operational, NOT stats)
 // ============================================================
+
+let dashboardSearchTimer = null;
 
 async function loadDashboard() {
   const el = document.getElementById('page-dashboard');
 
+  el.innerHTML = `
+    <div class="mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">Visitors</h2>
+      <p class="text-gray-500 mt-1">Search members, manage active visitors</p>
+    </div>
+
+    <!-- Search Section -->
+    <div class="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+      <div class="relative">
+        <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input type="text" id="dashboard-search" class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+               placeholder="Search members by name or email..."
+               autocomplete="off">
+      </div>
+      <p id="dashboard-search-hint" class="text-xs text-gray-400 mt-2">Enter at least 3 characters to search</p>
+      <div id="dashboard-search-results" class="mt-4 hidden">
+        <div class="flex items-center justify-between mb-2">
+          <span id="dashboard-search-count" class="text-sm text-gray-500"></span>
+        </div>
+        <div id="dashboard-search-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+      </div>
+    </div>
+
+    <!-- Active Visitors Section -->
+    <div class="mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-lg font-bold text-gray-900" id="active-visitors-header">Active Visitors (0)</h3>
+        <button onclick="loadActiveVisitors()" class="btn btn-sm btn-secondary">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Refresh
+        </button>
+      </div>
+      <div id="active-visitors-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+      <div id="active-visitors-pagination" class="mt-3 flex justify-center gap-2"></div>
+    </div>
+
+    <!-- Recent Forms Section -->
+    <div class="mb-6">
+      <h3 class="text-lg font-bold text-gray-900 mb-3">Recent Waiver Submissions</h3>
+      <div id="recent-forms-list" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <p class="text-gray-400 text-sm p-4 text-center">Loading...</p>
+      </div>
+    </div>
+
+    <!-- Floating action button -->
+    <button onclick="showNewMemberModal()" 
+            class="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center text-2xl transition z-40">
+      +
+    </button>
+  `;
+
+  // Set up search
+  const searchInput = document.getElementById('dashboard-search');
+  searchInput.addEventListener('input', () => {
+    clearTimeout(dashboardSearchTimer);
+    const q = searchInput.value.trim();
+    if (q.length < 3) {
+      document.getElementById('dashboard-search-results').classList.add('hidden');
+      document.getElementById('dashboard-search-hint').textContent = 'Enter at least 3 characters to search';
+      return;
+    }
+    dashboardSearchTimer = setTimeout(() => dashboardSearch(q), 300);
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      document.getElementById('dashboard-search-results').classList.add('hidden');
+    }
+  });
+
+  // Load active visitors and recent forms
+  await Promise.all([loadActiveVisitors(), loadRecentForms()]);
+}
+
+async function dashboardSearch(query) {
   try {
-    const stats = await api('GET', '/api/stats/dashboard');
+    const results = await api('GET', `/api/members/search?q=${encodeURIComponent(query)}&limit=30`);
+    const container = document.getElementById('dashboard-search-results');
+    const grid = document.getElementById('dashboard-search-grid');
+    const count = document.getElementById('dashboard-search-count');
+    const hint = document.getElementById('dashboard-search-hint');
 
-    el.innerHTML = `
-      <div class="mb-6">
-        <h2 class="text-2xl font-bold text-gray-900">Dashboard</h2>
-        <p class="text-gray-500 mt-1">Welcome to BoulderRyn</p>
-      </div>
+    container.classList.remove('hidden');
+    hint.textContent = '';
+    count.textContent = `${results.length} result${results.length !== 1 ? 's' : ''}`;
+    
+    if (results.length === 0) {
+      grid.innerHTML = '<p class="text-gray-400 text-sm col-span-2 text-center py-4">No members found</p>';
+      return;
+    }
 
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div class="card">
-          <div class="card-header">Today's Check-ins</div>
-          <div class="card-value">${stats.todayCheckIns}</div>
-        </div>
-        <div class="card">
-          <div class="card-header">Active Members</div>
-          <div class="card-value">${stats.activeMembers}</div>
-        </div>
-        <div class="card">
-          <div class="card-header">Today's Revenue</div>
-          <div class="card-value">£${stats.todayRevenue.toFixed(2)}</div>
-        </div>
-        <div class="card">
-          <div class="card-header">This Month</div>
-          <div class="card-value">£${stats.monthRevenue.toFixed(2)}</div>
-        </div>
-      </div>
+    grid.innerHTML = results.map(m => renderMemberCard(m)).join('');
+  } catch (err) {
+    document.getElementById('dashboard-search-hint').textContent = 'Search error: ' + err.message;
+  }
+}
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div class="card">
-          <div class="card-header">Quick Actions</div>
-          <div class="mt-3 space-y-2">
-            <button onclick="navigateTo('checkin')" class="btn btn-primary btn-lg w-full">Check In Member</button>
-            <button onclick="navigateTo('pos')" class="btn btn-secondary btn-lg w-full">Point of Sale</button>
-            <button onclick="showNewMemberModal()" class="btn btn-secondary btn-lg w-full">Register New Member</button>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header">Overview</div>
-          <div class="mt-3 space-y-3">
-            <div class="flex justify-between items-center py-2 border-b border-gray-100">
-              <span class="text-gray-600">Total Members</span>
-              <span class="font-semibold">${stats.totalMembers}</span>
-            </div>
-            <div class="flex justify-between items-center py-2 border-b border-gray-100">
-              <span class="text-gray-600">Week Revenue</span>
-              <span class="font-semibold">£${stats.weekRevenue.toFixed(2)}</span>
-            </div>
-            <div class="flex justify-between items-center py-2">
-              <span class="text-gray-600">Month Revenue</span>
-              <span class="font-semibold">£${stats.monthRevenue.toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+let activeVisitorsPage = 1;
+
+async function loadActiveVisitors(page = 1) {
+  activeVisitorsPage = page;
+  try {
+    const data = await api('GET', `/api/checkin/active?page=${page}&perPage=20`);
+    const header = document.getElementById('active-visitors-header');
+    const grid = document.getElementById('active-visitors-grid');
+    const pagination = document.getElementById('active-visitors-pagination');
+
+    header.textContent = `Active Visitors (${data.total})`;
+
+    if (data.visitors.length === 0) {
+      grid.innerHTML = '<p class="text-gray-400 text-sm col-span-2 text-center py-8">No active visitors today</p>';
+      pagination.innerHTML = '';
+      return;
+    }
+
+    grid.innerHTML = data.visitors.map(m => renderMemberCard(m, { showCheckin: false })).join('');
+
+    // Pagination
+    if (data.totalPages > 1) {
+      let paginationHtml = '';
+      for (let i = 1; i <= data.totalPages; i++) {
+        paginationHtml += `<button onclick="loadActiveVisitors(${i})" class="px-3 py-1 rounded text-sm ${i === page ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">${i}</button>`;
+      }
+      pagination.innerHTML = paginationHtml;
+    } else {
+      pagination.innerHTML = '';
+    }
+  } catch (err) {
+    document.getElementById('active-visitors-grid').innerHTML = `<p class="text-red-400 text-sm col-span-2">${err.message}</p>`;
+  }
+}
+
+async function loadRecentForms() {
+  try {
+    const forms = await api('GET', '/api/waivers/recent?limit=10');
+    const container = document.getElementById('recent-forms-list');
+
+    if (forms.length === 0) {
+      container.innerHTML = '<p class="text-gray-400 text-sm p-4 text-center">No waiver submissions yet</p>';
+      return;
+    }
+
+    container.innerHTML = `
+      <table class="w-full">
+        <thead>
+          <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-100">
+            <th class="px-4 py-2">Form</th>
+            <th class="px-4 py-2">Member</th>
+            <th class="px-4 py-2">Age</th>
+            <th class="px-4 py-2">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${forms.map(f => {
+            const age = calculateAge(f.date_of_birth);
+            const isUnder18 = age !== null && age < 18;
+            return `
+              <tr class="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onclick="openMemberProfile('${f.member_id}')">
+                <td class="px-4 py-2 text-sm">${f.waiver_name}</td>
+                <td class="px-4 py-2 text-sm font-medium">${f.first_name} ${f.last_name}</td>
+                <td class="px-4 py-2 text-sm ${isUnder18 ? 'text-blue-600 font-bold' : 'text-gray-500'}">${age ?? '—'}</td>
+                <td class="px-4 py-2 text-sm text-gray-400">${formatDateTime(f.signed_at)}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
     `;
   } catch (err) {
-    el.innerHTML = `<div class="card"><p class="text-red-500">Error loading dashboard: ${err.message}</p></div>`;
+    document.getElementById('recent-forms-list').innerHTML = `<p class="text-red-400 text-sm p-4">${err.message}</p>`;
   }
 }
 
@@ -165,10 +395,7 @@ async function loadCheckIn() {
 
   const searchInput = document.getElementById('checkin-search');
   searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      hideCheckinDropdown();
-      processCheckInSearch();
-    }
+    if (e.key === 'Enter') { hideCheckinDropdown(); processCheckInSearch(); }
     if (e.key === 'Escape') hideCheckinDropdown();
   });
   searchInput.addEventListener('input', () => {
@@ -177,12 +404,9 @@ async function loadCheckIn() {
     if (q.length < 2) { hideCheckinDropdown(); return; }
     checkinDebounceTimer = setTimeout(() => checkinLiveSearch(q), 300);
   });
-  // Hide dropdown when clicking outside
   document.addEventListener('click', (e) => {
     const dropdown = document.getElementById('checkin-dropdown');
-    if (dropdown && !dropdown.contains(e.target) && e.target.id !== 'checkin-search') {
-      hideCheckinDropdown();
-    }
+    if (dropdown && !dropdown.contains(e.target) && e.target.id !== 'checkin-search') hideCheckinDropdown();
   });
   searchInput.focus();
 }
@@ -205,12 +429,23 @@ async function checkinLiveSearch(query) {
       return;
     }
 
-    dropdown.innerHTML = results.map(m => `
-      <div onclick="checkinDropdownSelect('${m.id}')" style="padding:10px 16px; cursor:pointer; border-bottom:1px solid #f3f4f6; transition: background 0.1s;" onmouseenter="this.style.background='#eff6ff'" onmouseleave="this.style.background='#fff'">
-        <span style="font-weight:600; color:#111827;">${m.first_name} ${m.last_name}</span>
-        <span style="color:#9ca3af; font-size:0.8rem; margin-left:8px;">${m.email || ''}</span>
-      </div>
-    `).join('');
+    dropdown.innerHTML = results.map(m => {
+      const age = calculateAge(m.date_of_birth);
+      const isUnder18 = age !== null && age < 18;
+      return `
+        <div onclick="checkinDropdownSelect('${m.id}')" style="padding:10px 16px; cursor:pointer; border-bottom:1px solid #f3f4f6; display:flex; align-items:center; gap:8px;" onmouseenter="this.style.background='#eff6ff'" onmouseleave="this.style.background='#fff'">
+          <div style="width:32px;height:32px;border-radius:50%;background:${nameToColour(m.first_name+m.last_name)};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:0.7rem;flex-shrink:0">
+            ${getInitials(m.first_name, m.last_name).toUpperCase()}
+          </div>
+          <div style="flex:1;min-width:0">
+            <span style="font-weight:600; color:#111827;">${m.first_name} ${m.last_name}</span>
+            <span style="color:#9ca3af; font-size:0.8rem; margin-left:8px;">${m.email || ''}</span>
+            ${age !== null ? `<span style="color:${isUnder18 ? '#2563EB' : '#9ca3af'};font-size:0.75rem;margin-left:8px;${isUnder18 ? 'font-weight:700' : ''}">(${age})</span>` : ''}
+          </div>
+          ${!m.registration_fee_paid ? '<span style="width:20px;height:20px;background:#EF4444;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.65rem;font-weight:700;flex-shrink:0">!</span>' : ''}
+        </div>
+      `;
+    }).join('');
     dropdown.style.display = 'block';
   } catch (err) {
     dropdown.style.display = 'none';
@@ -230,56 +465,44 @@ async function processCheckInSearch() {
   const resultEl = document.getElementById('checkin-result');
 
   try {
-  // Try QR code first
-  if (query.startsWith('BR-')) {
-    const member = await api('GET', `/api/members/by-qr/${encodeURIComponent(query)}`);
-    if (member) {
-      await doCheckIn(member.id);
+    if (query.startsWith('BR-')) {
+      const member = await api('GET', `/api/members/by-qr/${encodeURIComponent(query)}`);
+      if (member) {
+        await doCheckIn(member.id);
+        document.getElementById('checkin-search').value = '';
+        return;
+      }
+    }
+
+    const results = await api('GET', `/api/members/search?q=${encodeURIComponent(query)}&limit=10`);
+
+    if (results.length === 0) {
+      resultEl.innerHTML = `
+        <div class="card checkin-result checkin-fail">
+          <p class="text-xl font-bold">No member found</p>
+          <p class="text-gray-500 mt-2">Try a different search or register a new member</p>
+          <button onclick="showNewMemberModal()" class="btn btn-primary mt-4">Register New Member</button>
+        </div>
+      `;
+      return;
+    }
+
+    if (results.length === 1) {
+      await doCheckIn(results[0].id);
       document.getElementById('checkin-search').value = '';
       return;
     }
-  }
 
-  // Search by name/email
-  const results = await api('GET', `/api/members/search?q=${encodeURIComponent(query)}&limit=10`);
-
-  if (results.length === 0) {
     resultEl.innerHTML = `
-      <div class="card checkin-result checkin-fail">
-        <p class="text-xl font-bold">No member found</p>
-        <p class="text-gray-500 mt-2">Try a different search or register a new member</p>
-        <button onclick="showNewMemberModal()" class="btn btn-primary mt-4">Register New Member</button>
+      <div class="card">
+        <p class="text-sm text-gray-500 mb-3">${results.length} members found — select one:</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          ${results.map(m => renderMemberCard(m)).join('')}
+        </div>
       </div>
     `;
-    return;
-  }
-
-  if (results.length === 1) {
-    await doCheckIn(results[0].id);
-    document.getElementById('checkin-search').value = '';
-    return;
-  }
-
-  resultEl.innerHTML = `
-    <div class="card">
-      <p class="text-sm text-gray-500 mb-3">${results.length} members found — select one:</p>
-      <div class="space-y-2">
-        ${results.map(m => `
-          <button onclick="doCheckIn('${m.id}')" class="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition">
-            <span class="font-semibold">${m.first_name} ${m.last_name}</span>
-            <span class="text-gray-500 text-sm ml-2">${m.email || ''}</span>
-          </button>
-        `).join('')}
-      </div>
-    </div>
-  `;
   } catch (err) {
-    resultEl.innerHTML = `
-      <div class="card checkin-result checkin-fail">
-        <p class="text-xl font-bold">Error</p>
-        <p class="text-gray-500 mt-2">${err.message}</p>
-      </div>
-    `;
+    resultEl.innerHTML = `<div class="card checkin-result checkin-fail"><p class="text-xl font-bold">Error</p><p class="text-gray-500 mt-2">${err.message}</p></div>`;
   }
 }
 
@@ -289,20 +512,31 @@ async function doCheckIn(memberId) {
 
   if (result.success) {
     const m = result.member;
+    const regWarning = result.registrationWarning;
+
     resultEl.innerHTML = `
       <div class="card checkin-result checkin-success">
         <svg class="w-16 h-16 mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
         <p class="checkin-name">${m.first_name} ${m.last_name}</p>
         <p class="text-gray-500">${result.alreadyCheckedIn ? 'Already checked in today' : result.message}</p>
         ${m.active_pass ? `<span class="badge badge-success mt-2">${m.active_pass.pass_name}</span>` : ''}
+        ${regWarning ? `
+          <div class="mt-4 bg-red-50 border-2 border-red-400 rounded-xl p-4">
+            <p class="text-red-600 font-bold text-lg">REGISTRATION FEE NOT PAID</p>
+            <p class="text-red-500 text-sm mt-1">Add £3.00 to next transaction</p>
+            <button onclick="openPOSForMember('${m.id}', '${m.first_name} ${m.last_name}')" class="btn btn-danger mt-2">Go to POS</button>
+          </div>
+        ` : ''}
       </div>
     `;
 
-    setTimeout(() => {
-      resultEl.innerHTML = '';
-      document.getElementById('checkin-search').value = '';
-      document.getElementById('checkin-search').focus();
-    }, 3000);
+    if (!regWarning) {
+      setTimeout(() => {
+        resultEl.innerHTML = '';
+        document.getElementById('checkin-search').value = '';
+        document.getElementById('checkin-search').focus();
+      }, 3000);
+    }
   } else {
     resultEl.innerHTML = `
       <div class="card checkin-result checkin-fail">
@@ -317,7 +551,7 @@ async function doCheckIn(memberId) {
 }
 
 // ============================================================
-// Members
+// Members Page
 // ============================================================
 
 async function loadMembers() {
@@ -340,11 +574,11 @@ async function loadMembers() {
       <table class="data-table">
         <thead>
           <tr>
-            <th>Name</th>
+            <th>Member</th>
             <th>Email</th>
-            <th>Phone</th>
-            <th>Pass Status</th>
+            <th>Reg.</th>
             <th>Waiver</th>
+            <th>Pass</th>
             <th>Joined</th>
           </tr>
         </thead>
@@ -387,106 +621,441 @@ async function refreshMembersList(query = '', page = 1) {
     return;
   }
 
-  tbody.innerHTML = members.map(m => `
-    <tr onclick="showMemberDetail('${m.id}')">
-      <td class="font-medium">${m.first_name} ${m.last_name}</td>
-      <td class="text-gray-500">${m.email || '—'}</td>
-      <td class="text-gray-500">${m.phone || '—'}</td>
-      <td><span class="badge badge-neutral">—</span></td>
-      <td><span class="badge badge-neutral">—</span></td>
-      <td class="text-gray-400 text-sm">${m.created_at ? new Date(m.created_at).toLocaleDateString('en-GB') : '—'}</td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = members.map(m => {
+    const initials = getInitials(m.first_name, m.last_name).toUpperCase();
+    const colour = nameToColour(m.first_name + m.last_name);
+    const regPaid = m.registration_fee_paid === 1;
+
+    return `
+      <tr onclick="openMemberProfile('${m.id}')">
+        <td>
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs" style="background:${colour}">${initials}</div>
+            <span class="font-medium">${m.first_name} ${m.last_name}</span>
+          </div>
+        </td>
+        <td class="text-gray-500">${m.email || '—'}</td>
+        <td class="text-center">
+          ${regPaid
+            ? '<span class="w-6 h-6 inline-flex items-center justify-center bg-green-100 text-green-600 rounded-full"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg></span>'
+            : '<span class="w-6 h-6 inline-flex items-center justify-center bg-red-100 text-red-600 rounded-full text-xs font-bold">!</span>'}
+        </td>
+        <td><span class="badge badge-neutral">—</span></td>
+        <td><span class="badge badge-neutral">—</span></td>
+        <td class="text-gray-400 text-sm">${m.created_at ? new Date(m.created_at).toLocaleDateString('en-GB') : '—'}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
-async function showMemberDetail(id) {
-  const member = await api('GET', `/api/members/${id}/with-pass-status`);
-  if (!member) return;
+// ============================================================
+// Member Profile Modal (COMPLETE REWRITE — matching Beta)
+// ============================================================
+
+async function openMemberProfile(memberId) {
+  try {
+    const [member, comments, passes, visits, transactions, events] = await Promise.all([
+      api('GET', `/api/members/${memberId}/with-pass-status`),
+      api('GET', `/api/members/${memberId}/comments`),
+      api('GET', `/api/passes/member/${memberId}`).catch(() => []),
+      api('GET', `/api/members/${memberId}/visits`),
+      api('GET', `/api/members/${memberId}/transactions`),
+      api('GET', `/api/members/${memberId}/events`),
+    ]);
+
+    if (!member) { showToast('Member not found', 'error'); return; }
+
+    const initials = getInitials(member.first_name, member.last_name).toUpperCase();
+    const colour = nameToColour(member.first_name + member.last_name);
+    const age = calculateAge(member.date_of_birth);
+    const isUnder18 = age !== null && age < 18;
+    const regPaid = member.registration_fee_paid === 1;
+    const fullName = `${member.first_name} ${member.last_name}`;
+
+    const address = [member.address_line1, member.address_line2, member.city, member.region, member.postal_code].filter(Boolean).join(', ');
+
+    // Make modal wider
+    document.getElementById('modal-content').className = 'bg-white rounded-xl shadow-2xl max-w-5xl w-full mx-4 max-h-[90vh] overflow-y-auto';
+
+    showModal(`
+      <div class="flex flex-col md:flex-row min-h-[500px]">
+        <!-- Left Side — Profile Info -->
+        <div class="md:w-80 flex-shrink-0 bg-gray-50 p-6 border-r border-gray-200 rounded-l-xl">
+          <!-- Close button -->
+          <div class="flex justify-end mb-2">
+            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <!-- Avatar + Name -->
+          <div class="text-center mb-4">
+            <div class="w-20 h-20 rounded-full flex items-center justify-center text-white font-bold text-2xl mx-auto mb-3" style="background:${colour}">${initials}</div>
+            <h3 class="text-lg font-bold text-gray-900">${fullName}</h3>
+          </div>
+
+          <!-- Registration Status -->
+          <div class="flex items-center justify-center gap-2 mb-4">
+            ${regPaid
+              ? '<span class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></span><span class="text-sm text-green-600 font-medium">Registered</span>'
+              : `<span class="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">!</span><span class="text-sm text-red-600 font-medium">Not Registered</span>
+                 <button onclick="validateRegistration('${member.id}')" class="btn btn-sm btn-danger ml-1">Validate</button>`}
+          </div>
+
+          <!-- Details -->
+          <div class="space-y-3 text-sm">
+            ${member.date_of_birth ? `
+              <div>
+                <span class="text-gray-400 text-xs uppercase">DOB</span>
+                <p class="font-medium">${formatDate(member.date_of_birth)} ${age !== null ? `<span class="${isUnder18 ? 'text-blue-600 font-bold' : 'text-gray-500'}">(${age})</span>` : ''}</p>
+              </div>
+            ` : ''}
+            ${member.gender ? `
+              <div>
+                <span class="text-gray-400 text-xs uppercase">Gender</span>
+                <p class="font-medium capitalize">${member.gender.replace('_', ' ')}</p>
+              </div>
+            ` : ''}
+            ${member.email ? `
+              <div>
+                <span class="text-gray-400 text-xs uppercase">Email</span>
+                <p class="font-medium text-blue-600">${member.email}</p>
+              </div>
+            ` : ''}
+            ${member.phone ? `
+              <div>
+                <span class="text-gray-400 text-xs uppercase">Phone</span>
+                <p class="font-medium">${member.phone}</p>
+              </div>
+            ` : ''}
+            ${address ? `
+              <div>
+                <span class="text-gray-400 text-xs uppercase">Address</span>
+                <p class="font-medium">${address}</p>
+              </div>
+            ` : ''}
+            ${member.emergency_contact_name ? `
+              <div>
+                <span class="text-gray-400 text-xs uppercase">Emergency Contact</span>
+                <p class="font-medium">${member.emergency_contact_name} ${member.emergency_contact_phone ? '(' + member.emergency_contact_phone + ')' : ''}</p>
+              </div>
+            ` : ''}
+            ${member.medical_conditions ? `
+              <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-2">
+                <span class="text-yellow-800 text-xs uppercase font-bold">Medical</span>
+                <p class="text-yellow-700 text-sm">${member.medical_conditions}</p>
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- Action buttons -->
+          <div class="mt-4 space-y-2">
+            <button onclick="closeModal(); openPOSForMember('${member.id}', '${fullName.replace(/'/g, "\\'")}')" class="btn btn-primary w-full btn-sm">Open in POS</button>
+            <button onclick="editMemberModal('${member.id}')" class="btn btn-secondary w-full btn-sm">Edit Profile</button>
+          </div>
+
+          <!-- Comments Section -->
+          <div class="mt-4 border-t border-gray-200 pt-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs uppercase font-bold text-gray-400">Comments (${comments.length})</span>
+              <button onclick="toggleCommentForm()" class="text-blue-600 text-xs font-medium hover:underline">+ Add</button>
+            </div>
+            <div id="comment-form-container" class="hidden mb-3">
+              <input type="text" id="comment-staff-name" class="form-input text-xs mb-1" placeholder="Your name" value="Staff">
+              <textarea id="comment-text" class="form-input text-xs" rows="2" placeholder="Add a comment..."></textarea>
+              <button onclick="addComment('${member.id}')" class="btn btn-sm btn-primary mt-1 w-full">Post Comment</button>
+            </div>
+            <div id="comments-list" class="space-y-2 max-h-40 overflow-y-auto">
+              ${comments.length === 0 ? '<p class="text-xs text-gray-400">No comments yet</p>' :
+                comments.map(c => `
+                  <div class="bg-white rounded-lg p-2 border border-gray-100">
+                    <div class="flex items-center gap-1 mb-0.5">
+                      <span class="text-xs font-bold text-gray-700">${c.staff_name}</span>
+                      <span class="text-xs text-gray-300">${formatDate(c.created_at)}</span>
+                    </div>
+                    <p class="text-xs text-gray-600">${c.comment}</p>
+                  </div>
+                `).join('')}
+            </div>
+          </div>
+
+          <!-- Tags Section -->
+          ${member.tags && member.tags.length > 0 ? `
+            <div class="mt-4 border-t border-gray-200 pt-4">
+              <span class="text-xs uppercase font-bold text-gray-400">Tags</span>
+              <div class="flex flex-wrap gap-1 mt-2">
+                ${member.tags.map(t => `<span class="px-2 py-0.5 rounded-full text-xs font-medium text-white" style="background:${t.colour || '#3B82F6'}">${t.name}</span>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Right Side — Tabs -->
+        <div class="flex-1 flex flex-col min-w-0">
+          <!-- Tab Headers -->
+          <div class="flex border-b border-gray-200">
+            <button onclick="switchProfileTab('passes')" class="profile-tab active px-4 py-3 text-sm font-medium border-b-2 border-blue-600 text-blue-600" data-tab="passes">Passes</button>
+            <button onclick="switchProfileTab('visits')" class="profile-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="visits">Visits</button>
+            <button onclick="switchProfileTab('events')" class="profile-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="events">Events</button>
+            <button onclick="switchProfileTab('transactions')" class="profile-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="transactions">Transactions</button>
+          </div>
+
+          <!-- Tab Content -->
+          <div class="flex-1 overflow-y-auto p-4">
+            <!-- Passes Tab -->
+            <div id="profile-tab-passes" class="profile-tab-content">
+              ${renderPassesTab(passes)}
+            </div>
+            <!-- Visits Tab -->
+            <div id="profile-tab-visits" class="profile-tab-content hidden">
+              ${renderVisitsTab(visits)}
+            </div>
+            <!-- Events Tab -->
+            <div id="profile-tab-events" class="profile-tab-content hidden">
+              ${renderEventsTab(events)}
+            </div>
+            <!-- Transactions Tab -->
+            <div id="profile-tab-transactions" class="profile-tab-content hidden">
+              ${renderTransactionsTab(transactions)}
+            </div>
+          </div>
+        </div>
+      </div>
+    `);
+  } catch (err) {
+    showToast('Error loading profile: ' + err.message, 'error');
+  }
+}
+
+function switchProfileTab(tabName) {
+  document.querySelectorAll('.profile-tab').forEach(t => {
+    t.classList.remove('active', 'border-blue-600', 'text-blue-600');
+    t.classList.add('border-transparent', 'text-gray-500');
+  });
+  document.querySelectorAll('.profile-tab-content').forEach(c => c.classList.add('hidden'));
+
+  const activeTab = document.querySelector(`.profile-tab[data-tab="${tabName}"]`);
+  if (activeTab) {
+    activeTab.classList.add('active', 'border-blue-600', 'text-blue-600');
+    activeTab.classList.remove('border-transparent', 'text-gray-500');
+  }
+  const content = document.getElementById(`profile-tab-${tabName}`);
+  if (content) content.classList.remove('hidden');
+}
+
+function renderPassesTab(passes) {
+  if (!passes || passes.length === 0) {
+    return '<p class="text-gray-400 text-center py-8">No passes</p>';
+  }
+  return passes.map(p => {
+    const isActive = p.status === 'active';
+    const statusColour = isActive ? 'green' : p.status === 'paused' ? 'yellow' : 'red';
+    return `
+      <div class="bg-white border border-gray-200 rounded-xl p-4 mb-3 ${isActive ? 'border-l-4 border-l-green-500' : ''}">
+        <div class="flex items-start justify-between">
+          <div>
+            <h4 class="font-bold text-sm">${p.pass_name || 'Pass'}</h4>
+            <p class="text-xs text-gray-500 mt-0.5">${p.category || ''}</p>
+          </div>
+          <span class="badge badge-${statusColour === 'green' ? 'success' : statusColour === 'yellow' ? 'warning' : 'danger'}">${p.status}</span>
+        </div>
+        <div class="flex items-center gap-4 mt-2 text-xs text-gray-500">
+          ${p.visits_remaining !== null ? `<span>Visits: ${p.visits_remaining} remaining</span>` : '<span>Unlimited visits</span>'}
+          ${p.started_at ? `<span>From: ${formatDate(p.started_at)}</span>` : ''}
+          ${p.expires_at ? `<span>Expires: ${formatDate(p.expires_at)}</span>` : ''}
+        </div>
+        ${p.status === 'paused' && p.pause_reason ? `<p class="text-xs text-yellow-600 mt-1">Paused: ${p.pause_reason}</p>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderVisitsTab(visits) {
+  if (!visits || visits.length === 0) {
+    return '<p class="text-gray-400 text-center py-8">No visit history</p>';
+  }
+  return `
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-xs text-gray-400 uppercase border-b">
+        <th class="pb-2">Date</th><th class="pb-2">Time</th><th class="pb-2">Method</th><th class="pb-2">Pass</th>
+      </tr></thead>
+      <tbody>
+        ${visits.map(v => `
+          <tr class="border-b border-gray-50">
+            <td class="py-2">${formatDate(v.checked_in_at)}</td>
+            <td class="py-2 text-gray-500">${v.checked_in_at ? new Date(v.checked_in_at).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '—'}</td>
+            <td class="py-2"><span class="badge badge-neutral">${v.method || 'desk'}</span></td>
+            <td class="py-2 text-gray-500">${v.pass_name || '—'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderEventsTab(events) {
+  if (!events || events.length === 0) {
+    return '<p class="text-gray-400 text-center py-8">No event history</p>';
+  }
+  return `
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-xs text-gray-400 uppercase border-b">
+        <th class="pb-2">Event</th><th class="pb-2">Date</th><th class="pb-2">Status</th>
+      </tr></thead>
+      <tbody>
+        ${events.map(e => `
+          <tr class="border-b border-gray-50">
+            <td class="py-2 font-medium">${e.event_name}</td>
+            <td class="py-2 text-gray-500">${formatDate(e.starts_at)}</td>
+            <td class="py-2"><span class="badge badge-neutral">${e.status}</span></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderTransactionsTab(transactions) {
+  if (!transactions || transactions.length === 0) {
+    return '<p class="text-gray-400 text-center py-8">No transactions</p>';
+  }
+  return `
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-xs text-gray-400 uppercase border-b">
+        <th class="pb-2">Date</th><th class="pb-2">Items</th><th class="pb-2">Method</th><th class="pb-2 text-right">Amount</th>
+      </tr></thead>
+      <tbody>
+        ${transactions.map(t => `
+          <tr class="border-b border-gray-50">
+            <td class="py-2">${formatDate(t.created_at)}</td>
+            <td class="py-2 text-gray-600 truncate max-w-[200px]">${t.items_summary || '—'}</td>
+            <td class="py-2"><span class="badge badge-neutral">${t.payment_method === 'dojo_card' ? 'Card' : t.payment_method}</span></td>
+            <td class="py-2 text-right font-semibold ${t.total_amount < 0 ? 'text-red-500' : ''}">£${Math.abs(t.total_amount).toFixed(2)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function toggleCommentForm() {
+  document.getElementById('comment-form-container').classList.toggle('hidden');
+}
+
+async function addComment(memberId) {
+  const staffName = document.getElementById('comment-staff-name').value.trim();
+  const comment = document.getElementById('comment-text').value.trim();
+  if (!comment) return;
+
+  try {
+    await api('POST', `/api/members/${memberId}/comments`, { staff_name: staffName || 'Staff', comment });
+    showToast('Comment added', 'success');
+    await openMemberProfile(memberId); // Refresh
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  }
+}
+
+async function validateRegistration(memberId) {
+  try {
+    await api('POST', `/api/members/${memberId}/validate-registration`);
+    showToast('Registration validated', 'success');
+    await openMemberProfile(memberId); // Refresh
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  }
+}
+
+async function editMemberModal(memberId) {
+  const m = await api('GET', `/api/members/${memberId}`);
+  if (!m) return;
+
+  // Reset modal width 
+  document.getElementById('modal-content').className = 'bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto';
 
   showModal(`
     <div class="p-6">
-      <div class="flex justify-between items-start mb-6">
-        <div>
-          <h3 class="text-xl font-bold">${member.first_name} ${member.last_name}</h3>
-          <p class="text-gray-500">${member.email || 'No email'}</p>
-          <p class="text-gray-400 text-sm">QR: ${member.qr_code}</p>
+      <h3 class="text-xl font-bold mb-4">Edit Member</h3>
+      <form id="edit-member-form" onsubmit="updateMember(event, '${m.id}')">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="form-group">
+            <label class="form-label">First Name *</label>
+            <input type="text" name="first_name" class="form-input" value="${m.first_name || ''}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Last Name *</label>
+            <input type="text" name="last_name" class="form-input" value="${m.last_name || ''}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-input" value="${m.email || ''}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone</label>
+            <input type="tel" name="phone" class="form-input" value="${m.phone || ''}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Date of Birth</label>
+            <input type="date" name="date_of_birth" class="form-input" value="${m.date_of_birth || ''}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Gender</label>
+            <select name="gender" class="form-select">
+              <option value="">—</option>
+              <option value="male" ${m.gender === 'male' ? 'selected' : ''}>Male</option>
+              <option value="female" ${m.gender === 'female' ? 'selected' : ''}>Female</option>
+              <option value="other" ${m.gender === 'other' ? 'selected' : ''}>Other</option>
+              <option value="prefer_not_to_say" ${m.gender === 'prefer_not_to_say' ? 'selected' : ''}>Prefer not to say</option>
+            </select>
+          </div>
         </div>
-        <div class="flex gap-2">
-          <button onclick="openPOSForMember('${member.id}', '${member.first_name} ${member.last_name}')" class="btn btn-sm btn-primary">Till</button>
-          ${!member.waiver_valid ? `<button onclick="openWaiverFlow('${member.id}')" class="btn btn-sm btn-danger">Sign Waiver</button>` : ''}
-          <button onclick="resendQr('${member.id}')" class="btn btn-sm btn-secondary">Re-send QR</button>
-          <button onclick="closeModal()" class="btn btn-sm btn-secondary">Close</button>
+        <div class="form-group">
+          <label class="form-label">Address</label>
+          <input type="text" name="address_line1" class="form-input mb-2" placeholder="Address Line 1" value="${m.address_line1 || ''}">
+          <input type="text" name="address_line2" class="form-input mb-2" placeholder="Address Line 2" value="${m.address_line2 || ''}">
+          <div class="grid grid-cols-3 gap-2">
+            <input type="text" name="city" class="form-input" placeholder="City" value="${m.city || ''}">
+            <input type="text" name="region" class="form-input" placeholder="County" value="${m.region || ''}">
+            <input type="text" name="postal_code" class="form-input" placeholder="Postcode" value="${m.postal_code || ''}">
+          </div>
         </div>
-      </div>
-
-      <div class="grid grid-cols-2 gap-4 mb-4">
-        <div>
-          <span class="text-sm text-gray-500">Pass Status</span>
-          <p class="font-semibold">${member.has_valid_pass
-            ? `<span class="badge badge-success">${member.active_pass.pass_name}</span>`
-            : '<span class="badge badge-danger">No active pass</span>'}</p>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="form-group">
+            <label class="form-label">Emergency Contact Name</label>
+            <input type="text" name="emergency_contact_name" class="form-input" value="${m.emergency_contact_name || ''}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Emergency Contact Phone</label>
+            <input type="tel" name="emergency_contact_phone" class="form-input" value="${m.emergency_contact_phone || ''}">
+          </div>
         </div>
-        <div>
-          <span class="text-sm text-gray-500">Waiver</span>
-          <p class="font-semibold">${member.waiver_valid
-            ? '<span class="badge badge-success">Valid</span>'
-            : '<span class="badge badge-danger">Missing/Expired</span>'}</p>
+        <div class="form-group">
+          <label class="form-label">Medical Conditions</label>
+          <input type="text" name="medical_conditions" class="form-input" value="${m.medical_conditions || ''}">
         </div>
-        <div>
-          <span class="text-sm text-gray-500">Phone</span>
-          <p>${member.phone || '—'}</p>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <textarea name="notes" class="form-input" rows="2">${m.notes || ''}</textarea>
         </div>
-        <div>
-          <span class="text-sm text-gray-500">DOB</span>
-          <p>${member.date_of_birth || '—'}</p>
+        <div class="flex justify-end gap-2 mt-6">
+          <button type="button" onclick="openMemberProfile('${m.id}')" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
         </div>
-        <div>
-          <span class="text-sm text-gray-500">Emergency Contact</span>
-          <p>${member.emergency_contact_name || '—'} ${member.emergency_contact_phone ? '(' + member.emergency_contact_phone + ')' : ''}</p>
-        </div>
-        <div>
-          <span class="text-sm text-gray-500">Experience</span>
-          <p>${member.climbing_experience || '—'}</p>
-        </div>
-      </div>
-
-      ${member.medical_conditions ? `
-        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-          <span class="text-sm font-semibold text-yellow-800">Medical:</span>
-          <span class="text-sm text-yellow-700 ml-1">${member.medical_conditions}</span>
-        </div>
-      ` : ''}
-
-      ${member.notes ? `
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-          <span class="text-sm font-semibold text-blue-800">Notes:</span>
-          <span class="text-sm text-blue-700 ml-1">${member.notes}</span>
-        </div>
-      ` : ''}
-
-      ${member.certifications && member.certifications.length > 0 ? `
-        <div class="mb-4">
-          <span class="text-sm text-gray-500">Certifications</span>
-          <div class="flex gap-1 mt-1">${member.certifications.map(c => `<span class="badge badge-info">${c.cert_name}</span>`).join('')}</div>
-        </div>
-      ` : ''}
-
-      ${member.tags && member.tags.length > 0 ? `
-        <div class="mb-4">
-          <span class="text-sm text-gray-500">Tags</span>
-          <div class="flex gap-1 mt-1">${member.tags.map(t => `<span class="badge badge-neutral">${t.name}</span>`).join('')}</div>
-        </div>
-      ` : ''}
+      </form>
     </div>
   `);
 }
 
-async function resendQr(memberId) {
-  const result = await api('POST', `/api/members/${memberId}/send-qr-email`);
-  if (result.success) {
-    showToast('QR code sent', 'success');
-  } else {
-    showToast('Failed: ' + result.error, 'error');
+async function updateMember(e, memberId) {
+  e.preventDefault();
+  const form = document.getElementById('edit-member-form');
+  const data = Object.fromEntries(new FormData(form));
+  try {
+    await api('PUT', `/api/members/${memberId}`, data);
+    showToast('Member updated', 'success');
+    await openMemberProfile(memberId);
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
   }
 }
 
@@ -495,6 +1064,9 @@ async function resendQr(memberId) {
 // ============================================================
 
 function showNewMemberModal() {
+  // Reset modal width
+  document.getElementById('modal-content').className = 'bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto';
+
   showModal(`
     <div class="p-6">
       <h3 class="text-xl font-bold mb-4">Register New Member</h3>
@@ -531,7 +1103,6 @@ function showNewMemberModal() {
             </select>
           </div>
         </div>
-
         <div class="form-group">
           <label class="form-label">Address</label>
           <input type="text" name="address_line1" class="form-input mb-2" placeholder="Address Line 1">
@@ -542,7 +1113,6 @@ function showNewMemberModal() {
             <input type="text" name="postal_code" class="form-input" placeholder="Postcode">
           </div>
         </div>
-
         <div class="grid grid-cols-2 gap-4">
           <div class="form-group">
             <label class="form-label">Emergency Contact Name</label>
@@ -553,12 +1123,10 @@ function showNewMemberModal() {
             <input type="tel" name="emergency_contact_phone" class="form-input">
           </div>
         </div>
-
         <div class="form-group">
           <label class="form-label">Medical Conditions</label>
           <input type="text" name="medical_conditions" class="form-input" placeholder="None, or describe...">
         </div>
-
         <div class="form-group">
           <label class="form-label">Climbing Experience</label>
           <select name="climbing_experience" class="form-select">
@@ -568,7 +1136,6 @@ function showNewMemberModal() {
             <option value="regular">Regular Climber</option>
           </select>
         </div>
-
         <div class="flex justify-end gap-2 mt-6">
           <button type="button" onclick="closeModal()" class="btn btn-secondary">Cancel</button>
           <button type="submit" class="btn btn-primary">Register Member</button>
@@ -580,7 +1147,6 @@ function showNewMemberModal() {
 
 async function createMember(e) {
   e.preventDefault();
-
   const form = document.getElementById('new-member-form');
   const data = Object.fromEntries(new FormData(form));
 
@@ -589,16 +1155,20 @@ async function createMember(e) {
     closeModal();
     showToast(`${member.first_name} ${member.last_name} registered`, 'success');
 
-    // Send QR if email provided
     if (member.email) {
       api('POST', `/api/members/${member.id}/send-qr-email`).then(r => {
         if (r.success) showToast('QR code sent to ' + member.email, 'info');
       });
     }
 
-    // Refresh members list if on that page
+    // Refresh current page
     if (document.getElementById('page-members').classList.contains('active')) {
       await refreshMembersList();
+    }
+    if (document.getElementById('page-dashboard').classList.contains('active')) {
+      // Trigger re-search if there was a query
+      const q = document.getElementById('dashboard-search')?.value;
+      if (q && q.length >= 3) await dashboardSearch(q);
     }
   } catch (err) {
     showToast('Error: ' + err.message, 'error');
@@ -606,21 +1176,19 @@ async function createMember(e) {
 }
 
 // ============================================================
-// Open POS for a specific member (from member detail)
+// Open POS for a specific member
 // ============================================================
 
 async function openPOSForMember(memberId, memberName) {
   closeModal();
   navigateTo('pos');
 
-  // Wait a tick for POS page to render, then set the member
-  await new Promise(r => setTimeout(r, 100));
+  await new Promise(r => setTimeout(r, 200));
 
   try {
     const member = await api('GET', `/api/members/${memberId}/with-pass-status`);
     posSelectMember(member);
   } catch (err) {
-    // Fallback: construct a minimal member object from what we have
     const [firstName, ...rest] = memberName.split(' ');
     posSelectMember({ id: memberId, first_name: firstName, last_name: rest.join(' ') });
   }
@@ -632,28 +1200,28 @@ async function openPOSForMember(memberId, memberName) {
 
 function loadEvents() {
   document.getElementById('page-events').innerHTML = `
-    <div class="mb-6"><h2 class="text-2xl font-bold">Events & Scheduling</h2><p class="text-gray-500 mt-1">Coming in Module 5</p></div>
-    <div class="card"><p class="text-gray-400">Events, courses, slot booker, and staff rota — under development.</p></div>
+    <div class="mb-6"><h2 class="text-2xl font-bold">Events & Scheduling</h2><p class="text-gray-500 mt-1">Coming soon</p></div>
+    <div class="card"><p class="text-gray-400">Events, courses, slot booker — under development.</p></div>
   `;
 }
 
 function loadRoutes() {
   document.getElementById('page-routes').innerHTML = `
-    <div class="mb-6"><h2 class="text-2xl font-bold">Routes</h2><p class="text-gray-500 mt-1">Coming in Module 6</p></div>
-    <div class="card"><p class="text-gray-400">Route management, gym map, logbooks, competitions — under development.</p></div>
+    <div class="mb-6"><h2 class="text-2xl font-bold">Routes</h2><p class="text-gray-500 mt-1">Coming soon</p></div>
+    <div class="card"><p class="text-gray-400">Route management, gym map, logbooks — under development.</p></div>
   `;
 }
 
 function loadAnalytics() {
   document.getElementById('page-analytics').innerHTML = `
-    <div class="mb-6"><h2 class="text-2xl font-bold">Analytics</h2><p class="text-gray-500 mt-1">Coming in Module 7</p></div>
+    <div class="mb-6"><h2 class="text-2xl font-bold">Analytics</h2><p class="text-gray-500 mt-1">Coming soon</p></div>
     <div class="card"><p class="text-gray-400">Dashboards, reports, retention analytics — under development.</p></div>
   `;
 }
 
 function loadStaff() {
   document.getElementById('page-staff').innerHTML = `
-    <div class="mb-6"><h2 class="text-2xl font-bold">Settings & Staff</h2><p class="text-gray-500 mt-1">Coming in Module 8</p></div>
+    <div class="mb-6"><h2 class="text-2xl font-bold">Settings & Staff</h2><p class="text-gray-500 mt-1">Coming soon</p></div>
     <div class="card"><p class="text-gray-400">Staff management, permissions, system settings — under development.</p></div>
   `;
 }
@@ -670,6 +1238,8 @@ function showModal(html) {
 function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
   document.getElementById('modal-content').innerHTML = '';
+  // Reset modal width
+  document.getElementById('modal-content').className = 'bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto';
 }
 
 document.getElementById('modal-overlay').addEventListener('click', (e) => {

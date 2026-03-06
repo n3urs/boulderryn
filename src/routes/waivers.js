@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const Waiver = require('../main/models/waiver');
+const { getDb } = require('../main/database/db');
 
 router.get('/templates', (req, res, next) => {
   try { res.json(Waiver.listTemplates()); } catch (e) { next(e); }
@@ -7,6 +8,25 @@ router.get('/templates', (req, res, next) => {
 
 router.get('/templates/active/:type', (req, res, next) => {
   try { res.json(Waiver.getActiveTemplate(req.params.type) || null); } catch (e) { next(e); }
+});
+
+// Recent waiver submissions
+router.get('/recent', (req, res, next) => {
+  try {
+    const db = getDb();
+    const limit = parseInt(req.query.limit) || 20;
+    const recent = db.prepare(`
+      SELECT sw.id, sw.member_id, sw.signed_at, sw.expires_at,
+        wt.name as waiver_name, wt.type as waiver_type,
+        m.first_name, m.last_name, m.date_of_birth
+      FROM signed_waivers sw
+      JOIN waiver_templates wt ON sw.waiver_template_id = wt.id
+      JOIN members m ON sw.member_id = m.id
+      ORDER BY sw.signed_at DESC
+      LIMIT ?
+    `).all(limit);
+    res.json(recent);
+  } catch (e) { next(e); }
 });
 
 router.post('/sign', (req, res, next) => {

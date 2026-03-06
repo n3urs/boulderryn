@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS members (
   notes TEXT,                             -- staff freeform notes
   qr_code TEXT,                           -- unique QR identifier string
   is_minor INTEGER DEFAULT 0,            -- 1 if under 18
+  registration_fee_paid INTEGER DEFAULT 0, -- 1 = paid £3, 0 = not yet
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -96,6 +97,20 @@ CREATE TABLE IF NOT EXISTS member_tags (
   applied_by TEXT,                        -- 'system' or staff name
   PRIMARY KEY (member_id, tag_id)
 );
+
+-- ============================================================
+-- STAFF COMMENTS
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS staff_comments (
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  staff_name TEXT NOT NULL,
+  comment TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_staff_comments_member ON staff_comments(member_id);
 
 -- ============================================================
 -- WAIVERS
@@ -197,7 +212,8 @@ CREATE INDEX IF NOT EXISTS idx_check_ins_member ON check_ins(member_id);
 
 CREATE TABLE IF NOT EXISTS product_categories (
   id TEXT PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,             -- 'Passes', 'Rental', 'Café', 'Merchandise'
+  name TEXT NOT NULL UNIQUE,             -- 'Cold Drinks', 'Day Entry', etc.
+  icon TEXT,                              -- emoji or icon identifier
   sort_order INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
@@ -214,6 +230,7 @@ CREATE TABLE IF NOT EXISTS products (
   stock_enforce_limit INTEGER DEFAULT 0, -- 1 = prevent sale when out of stock
   requires_certification_id TEXT REFERENCES certification_types(id),
   linked_pass_type_id TEXT REFERENCES pass_types(id),  -- smart product: auto-issue this pass
+  product_code TEXT,                       -- e.g. C-00001, EVT-0001
   is_active INTEGER DEFAULT 1,
   sort_order INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
@@ -586,10 +603,14 @@ INSERT OR IGNORE INTO walls (id, name, colour, description, sort_order) VALUES
   ('wall_mothership', 'Mothership', '#EAB308', 'Centre island — routes all the way around', 2),
   ('wall_mystery', 'Magical Mystery', '#EF4444', 'Right wall', 3);
 
--- Default product categories
-INSERT OR IGNORE INTO product_categories (id, name, sort_order) VALUES
-  ('cat_passes', 'Passes', 1),
-  ('cat_rental', 'Rental', 2),
-  ('cat_registration', 'Registration', 3),
-  ('cat_cafe', 'Café', 4),
-  ('cat_merch', 'Merchandise', 5);
+-- Default product categories (matching Beta)
+INSERT OR IGNORE INTO product_categories (id, name, icon, sort_order) VALUES
+  ('cat_cold_drinks', 'Cold Drinks', '🥤', 1),
+  ('cat_day_entry', 'Day Entry', '🎟️', 2),
+  ('cat_events', 'Events', '🎪', 3),
+  ('cat_food', 'Food', '🍕', 4),
+  ('cat_hire', 'Hire', '👟', 5),
+  ('cat_hot_drinks', 'Hot Drinks', '☕', 6),
+  ('cat_membership', 'Membership', '💳', 7),
+  ('cat_prepaid', 'Prepaid', '🎫', 8),
+  ('cat_products', 'Products', '🧗', 9);

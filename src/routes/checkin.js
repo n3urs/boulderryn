@@ -20,7 +20,13 @@ router.post('/process', (req, res, next) => {
     }
 
     if (member.checked_in_today) {
-      return res.json({ success: true, alreadyCheckedIn: true, member, message: 'Already checked in today' });
+      return res.json({
+        success: true,
+        alreadyCheckedIn: true,
+        member,
+        message: 'Already checked in today',
+        registrationWarning: !member.registration_fee_paid
+      });
     }
 
     const now = new Date();
@@ -40,12 +46,43 @@ router.post('/process', (req, res, next) => {
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(checkInId, memberId, member.active_pass.id, 'staff', method || 'desk', isPeak ? 1 : 0);
 
+    const updatedMember = Member.getWithPassStatus(memberId);
+
     res.json({
       success: true,
-      member: Member.getWithPassStatus(memberId),
+      member: updatedMember,
       checkInId,
-      message: `Welcome, ${member.first_name}!`
+      message: `Welcome, ${member.first_name}!`,
+      registrationWarning: !updatedMember.registration_fee_paid
     });
+  } catch (e) { next(e); }
+});
+
+// Active visitors (checked in today)
+router.get('/active', (req, res, next) => {
+  try {
+    const db = getDb();
+    const page = parseInt(req.query.page) || 1;
+    const perPage = parseInt(req.query.perPage) || 20;
+    const offset = (page - 1) * perPage;
+
+    const visitors = db.prepare(`
+      SELECT m.*, ci.checked_in_at, ci.method,
+        MAX(ci.checked_in_at) as latest_checkin
+      FROM check_ins ci
+      JOIN members m ON ci.member_id = m.id
+      WHERE date(ci.checked_in_at) = date('now')
+      GROUP BY m.id
+      ORDER BY latest_checkin DESC
+      LIMIT ? OFFSET ?
+    `).all(perPage, offset);
+
+    const total = db.prepare(`
+      SELECT count(DISTINCT member_id) as c FROM check_ins
+      WHERE date(checked_in_at) = date('now')
+    `).get().c;
+
+    res.json({ visitors, total, page, perPage, totalPages: Math.ceil(total / perPage) });
   } catch (e) { next(e); }
 });
 

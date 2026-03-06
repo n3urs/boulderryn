@@ -97,7 +97,7 @@ const Product = {
     const grouped = {};
 
     categories.forEach(cat => {
-      grouped[cat.id] = { ...cat, products: [] };
+      grouped[cat.id] = { id: cat.id, name: cat.name, icon: cat.icon, sort_order: cat.sort_order, products: [] };
     });
 
     // Uncategorised bucket

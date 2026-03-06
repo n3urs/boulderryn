@@ -1,6 +1,5 @@
 /**
  * BoulderRyn — Express Web Server
- * Replaces Electron main process
  */
 
 const express = require('express');
@@ -10,15 +9,16 @@ const { getDb, closeDb } = require('./src/main/database/db');
 // Models
 const Pass = require('./src/main/models/pass');
 const Waiver = require('./src/main/models/waiver');
+const { seedProducts } = require('./src/main/models/seed-products');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(express.json({ limit: '10mb' })); // large limit for signature images
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// API Routes (registered before static so they take priority)
+// API Routes
 app.use('/api/members', require('./src/routes/members'));
 app.use('/api/checkin', require('./src/routes/checkin'));
 app.use('/api/products', require('./src/routes/products'));
@@ -36,7 +36,7 @@ app.use('/api/stats', require('./src/routes/stats'));
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, 'src', 'public')));
 
-// SPA fallback — serve index.html for any non-API route
+// SPA fallback
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'src', 'public', 'index.html'));
 });
@@ -55,6 +55,7 @@ app.listen(PORT, () => {
   // Seed defaults on first run
   Pass.seedDefaults();
   Waiver.seedDefaults();
+  seedProducts();
 
   console.log(`BoulderRyn running at http://localhost:${PORT}`);
 });

@@ -28,6 +28,10 @@ router.get('/all/:memberId', (req, res, next) => {
   try { res.json(Pass.getAllPasses(req.params.memberId)); } catch (e) { next(e); }
 });
 
+router.get('/member/:memberId', (req, res, next) => {
+  try { res.json(Pass.getAllPasses(req.params.memberId)); } catch (e) { next(e); }
+});
+
 router.get('/:id', (req, res, next) => {
   try { res.json(Pass.getById(req.params.id) || null); } catch (e) { next(e); }
 });
