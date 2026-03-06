@@ -59,20 +59,29 @@
       <p class="text-gray-500 text-sm mb-4">Please watch the full induction video before continuing. This covers important safety information.</p>
 
       <div class="bg-black rounded-xl overflow-hidden mb-4 aspect-video">
-        <iframe id="induction-video" src="https://www.youtube.com/embed/-r2zbi21aks" 
-                class="w-full h-full" frameborder="0" 
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                allowfullscreen></iframe>
+        <div id="yt-player-container">
+          <div id="yt-player"></div>
+        </div>
       </div>
 
-      <label class="checkbox-card flex items-start gap-3 p-4 bg-white rounded-xl border border-gray-200 cursor-pointer mb-4">
-        <input type="checkbox" id="video-watched" class="mt-0.5 w-5 h-5 rounded border-gray-300 text-blue-600 flex-shrink-0">
-        <span class="text-sm text-gray-700 font-medium">I have watched the full induction video and understand the safety information presented</span>
-      </label>
+      <div id="video-waiting" class="text-center text-sm text-gray-400 mb-4">
+        <div class="flex items-center justify-center gap-2">
+          <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"/><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" class="opacity-75"/></svg>
+          <span>Please watch the full video to continue</span>
+        </div>
+      </div>
+      <div id="video-complete" class="hidden text-center text-sm text-green-600 mb-4 font-medium">
+        Video complete
+      </div>
 
       <button onclick="goToStep(2)" id="btn-step1-next" disabled
               class="w-full py-3.5 bg-blue-600 text-white font-semibold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700 transition text-sm">
         Continue
+      </button>
+
+      <!-- Staff skip: triple-tap the BR logo in the header to reveal, then enter PIN -->
+      <button id="staff-skip-btn" class="hidden mt-3 w-full py-2 text-xs text-gray-400 hover:text-gray-600 transition">
+        Staff: Skip Video
       </button>
     </div>
 
@@ -391,6 +400,10 @@
     // Step Navigation
     // =============================================
     function goToStep(step) {
+      // Kill video when leaving step 1
+      if (currentStep === 1 && step !== 1) {
+        killVideo();
+      }
       document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
       document.getElementById(`step-${step}`).classList.add('active');
       currentStep = step;
@@ -426,10 +439,82 @@
     }
 
     // =============================================
-    // Step 1: Video
+    // Step 1: Video (YouTube IFrame API)
     // =============================================
-    document.getElementById('video-watched').addEventListener('change', function() {
-      document.getElementById('btn-step1-next').disabled = !this.checked;
+    let ytPlayer = null;
+    let videoEnded = false;
+
+    // Load YouTube IFrame API
+    const ytScript = document.createElement('script');
+    ytScript.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(ytScript);
+
+    window.onYouTubeIframeAPIReady = function() {
+      ytPlayer = new YT.Player('yt-player', {
+        height: '100%',
+        width: '100%',
+        videoId: '-r2zbi21aks',
+        playerVars: {
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          disablekb: 1
+        },
+        events: {
+          onStateChange: onPlayerStateChange
+        }
+      });
+    };
+
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.ENDED) {
+        videoEnded = true;
+        document.getElementById('btn-step1-next').disabled = false;
+        document.getElementById('video-waiting').classList.add('hidden');
+        document.getElementById('video-complete').classList.remove('hidden');
+      }
+    }
+
+    function killVideo() {
+      if (ytPlayer && typeof ytPlayer.stopVideo === 'function') {
+        ytPlayer.stopVideo();
+      }
+    }
+
+    // Staff skip: triple-tap the header logo to reveal the skip button
+    let headerTaps = 0;
+    let headerTapTimer = null;
+    document.querySelector('header').addEventListener('click', function() {
+      headerTaps++;
+      clearTimeout(headerTapTimer);
+      headerTapTimer = setTimeout(() => { headerTaps = 0; }, 800);
+      if (headerTaps >= 3) {
+        document.getElementById('staff-skip-btn').classList.remove('hidden');
+        headerTaps = 0;
+      }
+    });
+
+    document.getElementById('staff-skip-btn').addEventListener('click', function() {
+      const pin = prompt('Staff PIN:');
+      if (!pin) return;
+      // Verify PIN with server
+      fetch('/api/staff/auth/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          alert('Invalid PIN');
+          return;
+        }
+        // PIN accepted — skip video
+        videoEnded = true;
+        killVideo();
+        goToStep(2);
+      })
+      .catch(() => alert('Could not verify PIN'));
     });
 
     // =============================================
