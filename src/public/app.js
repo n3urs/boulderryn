@@ -140,6 +140,8 @@ async function loadDashboard() {
 // Check-In
 // ============================================================
 
+let checkinDebounceTimer = null;
+
 async function loadCheckIn() {
   const el = document.getElementById('page-checkin');
   el.innerHTML = `
@@ -150,8 +152,9 @@ async function loadCheckIn() {
 
     <div class="card mb-4">
       <div class="flex gap-4">
-        <div class="flex-1">
-          <input type="text" id="checkin-search" class="form-input text-lg" placeholder="Scan QR code or type name/email..." autofocus>
+        <div class="flex-1" style="position: relative;">
+          <input type="text" id="checkin-search" class="form-input text-lg" placeholder="Scan QR code or type name/email..." autofocus autocomplete="off">
+          <div id="checkin-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:50; background:#fff; border:1px solid #e5e7eb; border-radius:0.5rem; box-shadow:0 4px 16px rgba(0,0,0,0.12); max-height:320px; overflow-y:auto; margin-top:4px;"></div>
         </div>
         <button onclick="processCheckInSearch()" class="btn btn-primary btn-lg">Search</button>
       </div>
@@ -162,9 +165,62 @@ async function loadCheckIn() {
 
   const searchInput = document.getElementById('checkin-search');
   searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') processCheckInSearch();
+    if (e.key === 'Enter') {
+      hideCheckinDropdown();
+      processCheckInSearch();
+    }
+    if (e.key === 'Escape') hideCheckinDropdown();
+  });
+  searchInput.addEventListener('input', () => {
+    clearTimeout(checkinDebounceTimer);
+    const q = searchInput.value.trim();
+    if (q.length < 2) { hideCheckinDropdown(); return; }
+    checkinDebounceTimer = setTimeout(() => checkinLiveSearch(q), 300);
+  });
+  // Hide dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('checkin-dropdown');
+    if (dropdown && !dropdown.contains(e.target) && e.target.id !== 'checkin-search') {
+      hideCheckinDropdown();
+    }
   });
   searchInput.focus();
+}
+
+function hideCheckinDropdown() {
+  const dd = document.getElementById('checkin-dropdown');
+  if (dd) dd.style.display = 'none';
+}
+
+async function checkinLiveSearch(query) {
+  const dropdown = document.getElementById('checkin-dropdown');
+  if (!dropdown) return;
+
+  try {
+    const results = await api('GET', `/api/members/search?q=${encodeURIComponent(query)}&limit=10`);
+
+    if (results.length === 0) {
+      dropdown.innerHTML = `<div style="padding:12px 16px; color:#9ca3af; font-size:0.875rem;">No members found</div>`;
+      dropdown.style.display = 'block';
+      return;
+    }
+
+    dropdown.innerHTML = results.map(m => `
+      <div onclick="checkinDropdownSelect('${m.id}')" style="padding:10px 16px; cursor:pointer; border-bottom:1px solid #f3f4f6; transition: background 0.1s;" onmouseenter="this.style.background='#eff6ff'" onmouseleave="this.style.background='#fff'">
+        <span style="font-weight:600; color:#111827;">${m.first_name} ${m.last_name}</span>
+        <span style="color:#9ca3af; font-size:0.8rem; margin-left:8px;">${m.email || ''}</span>
+      </div>
+    `).join('');
+    dropdown.style.display = 'block';
+  } catch (err) {
+    dropdown.style.display = 'none';
+  }
+}
+
+async function checkinDropdownSelect(memberId) {
+  hideCheckinDropdown();
+  document.getElementById('checkin-search').value = '';
+  await doCheckIn(memberId);
 }
 
 async function processCheckInSearch() {
@@ -173,6 +229,7 @@ async function processCheckInSearch() {
 
   const resultEl = document.getElementById('checkin-result');
 
+  try {
   // Try QR code first
   if (query.startsWith('BR-')) {
     const member = await api('GET', `/api/members/by-qr/${encodeURIComponent(query)}`);
@@ -216,6 +273,14 @@ async function processCheckInSearch() {
       </div>
     </div>
   `;
+  } catch (err) {
+    resultEl.innerHTML = `
+      <div class="card checkin-result checkin-fail">
+        <p class="text-xl font-bold">Error</p>
+        <p class="text-gray-500 mt-2">${err.message}</p>
+      </div>
+    `;
+  }
 }
 
 async function doCheckIn(memberId) {
@@ -241,7 +306,7 @@ async function doCheckIn(memberId) {
   } else {
     resultEl.innerHTML = `
       <div class="card checkin-result checkin-fail">
-        <svg class="w-16 h-16 mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+        <svg class="w-16 h-16 mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
         <p class="checkin-name">${result.member ? result.member.first_name + ' ' + result.member.last_name : 'Unknown'}</p>
         <p class="text-red-500 font-semibold">${result.error}</p>
         ${result.needsWaiver ? '<button onclick="navigateTo(\'members\')" class="btn btn-primary mt-4">Complete Waiver</button>' : ''}
@@ -347,6 +412,7 @@ async function showMemberDetail(id) {
           <p class="text-gray-400 text-sm">QR: ${member.qr_code}</p>
         </div>
         <div class="flex gap-2">
+          <button onclick="openPOSForMember('${member.id}', '${member.first_name} ${member.last_name}')" class="btn btn-sm btn-primary">Till</button>
           ${!member.waiver_valid ? `<button onclick="openWaiverFlow('${member.id}')" class="btn btn-sm btn-danger">Sign Waiver</button>` : ''}
           <button onclick="resendQr('${member.id}')" class="btn btn-sm btn-secondary">Re-send QR</button>
           <button onclick="closeModal()" class="btn btn-sm btn-secondary">Close</button>
@@ -536,6 +602,27 @@ async function createMember(e) {
     }
   } catch (err) {
     showToast('Error: ' + err.message, 'error');
+  }
+}
+
+// ============================================================
+// Open POS for a specific member (from member detail)
+// ============================================================
+
+async function openPOSForMember(memberId, memberName) {
+  closeModal();
+  navigateTo('pos');
+
+  // Wait a tick for POS page to render, then set the member
+  await new Promise(r => setTimeout(r, 100));
+
+  try {
+    const member = await api('GET', `/api/members/${memberId}/with-pass-status`);
+    posSelectMember(member);
+  } catch (err) {
+    // Fallback: construct a minimal member object from what we have
+    const [firstName, ...rest] = memberName.split(' ');
+    posSelectMember({ id: memberId, first_name: firstName, last_name: rest.join(' ') });
   }
 }
 

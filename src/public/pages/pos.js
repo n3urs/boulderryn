@@ -12,9 +12,9 @@ async function loadPOS() {
     <div class="flex gap-4 h-[calc(100vh-7rem)]">
       <!-- Left: Product Grid -->
       <div class="flex-1 flex flex-col overflow-hidden" style="min-width: 0;">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-2xl font-bold text-gray-900">Point of Sale</h2>
-          <div class="flex gap-2">
+        <div class="flex justify-between items-center mb-4 flex-shrink-0">
+          <h2 class="text-2xl font-bold text-gray-900 whitespace-nowrap">Point of Sale</h2>
+          <div class="flex gap-2 flex-shrink-0">
             <button onclick="showAddProductModal()" class="btn btn-sm btn-secondary">+ Add Product</button>
             <button onclick="showDailySummaryModal()" class="btn btn-sm btn-secondary">End of Day</button>
           </div>
@@ -28,7 +28,7 @@ async function loadPOS() {
       </div>
 
       <!-- Right: Cart -->
-      <div class="w-80 flex flex-col bg-white border border-gray-200 rounded-xl" style="flex-shrink: 0; min-width: 320px;">
+      <div class="w-80 flex flex-col bg-white border border-gray-200 rounded-xl" style="flex-shrink: 0;">
         <!-- Member selection -->
         <div class="p-4 border-b border-gray-100">
           <div class="flex gap-2">
