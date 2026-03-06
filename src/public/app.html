@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>BoulderRyn</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#1E3A5F',
+            'navy-light': '#2A4D7A',
+            'navy-dark': '#152C48',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .code-input { caret-color: transparent; }
+    .code-input:focus { outline: none; border-color: #1E3A5F; background: #F1F5F9; }
+    .nav-item.active { color: #1E3A5F; }
+    .nav-item.active svg { stroke: #1E3A5F; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .fade-in { animation: fadeIn 0.2s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .climb-card:active { transform: scale(0.98); }
+    .send-btn:active { transform: scale(0.95); }
+    /* hide scrollbar */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 max-w-lg mx-auto min-h-screen">
+
+  <!-- ═══════════ LOGIN PAGE ═══════════ -->
+  <div id="login-page" class="min-h-screen flex flex-col items-center justify-center px-6">
+    <div class="w-full max-w-sm">
+      <div class="text-center mb-10">
+        <div class="w-16 h-16 bg-navy rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h3l1-3h10l1 3h3M7 18l2-7h6l2 7M12 3v4m-3-1l1 3m5-3l-1 3"/>
+          </svg>
+        </div>
+        <h1 class="text-2xl font-bold text-navy">BoulderRyn</h1>
+        <p class="text-gray-500 mt-1">Welcome back, climber</p>
+      </div>
+
+      <!-- Email step -->
+      <div id="email-step">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+        <input id="login-email" type="email" placeholder="you@email.com"
+               class="w-full px-4 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy">
+        <button id="send-code-btn" onclick="requestCode()"
+                class="w-full mt-4 bg-navy text-white py-3 rounded-xl font-semibold text-base hover:bg-navy-light transition">
+          Send Login Code
+        </button>
+        <p id="email-error" class="text-red-500 text-sm mt-2 hidden"></p>
+      </div>
+
+      <!-- Code step -->
+      <div id="code-step" class="hidden">
+        <p class="text-sm text-gray-600 mb-4">Enter the 6-digit code sent to <span id="sent-to-email" class="font-medium text-navy"></span></p>
+        <div class="flex gap-2 justify-center mb-4">
+          <input class="code-input w-12 h-14 text-center text-xl font-bold border border-gray-300 rounded-lg" type="text" maxlength="1" inputmode="numeric" data-idx="0">
+          <input class="code-input w-12 h-14 text-center text-xl font-bold border border-gray-300 rounded-lg" type="text" maxlength="1" inputmode="numeric" data-idx="1">
+          <input class="code-input w-12 h-14 text-center text-xl font-bold border border-gray-300 rounded-lg" type="text" maxlength="1" inputmode="numeric" data-idx="2">
+          <input class="code-input w-12 h-14 text-center text-xl font-bold border border-gray-300 rounded-lg" type="text" maxlength="1" inputmode="numeric" data-idx="3">
+          <input class="code-input w-12 h-14 text-center text-xl font-bold border border-gray-300 rounded-lg" type="text" maxlength="1" inputmode="numeric" data-idx="4">
+          <input class="code-input w-12 h-14 text-center text-xl font-bold border border-gray-300 rounded-lg" type="text" maxlength="1" inputmode="numeric" data-idx="5">
+        </div>
+        <button id="verify-btn" onclick="verifyCode()"
+                class="w-full bg-navy text-white py-3 rounded-xl font-semibold text-base hover:bg-navy-light transition">
+          Verify
+        </button>
+        <button onclick="backToEmail()" class="w-full mt-2 text-gray-500 text-sm py-2">Use a different email</button>
+        <p id="code-error" class="text-red-500 text-sm mt-2 hidden"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ APP SHELL ═══════════ -->
+  <div id="app-shell" class="hidden pb-20">
+
+    <!-- HOME PAGE -->
+    <div id="page-home" class="page active fade-in">
+      <div class="px-5 pt-6 pb-4">
+        <h1 class="text-2xl font-bold text-navy">Hey, <span id="home-name"></span></h1>
+        <p class="text-gray-500 text-sm mt-1">Let's get climbing</p>
+      </div>
+
+      <!-- Quick Stats -->
+      <div class="px-5 grid grid-cols-3 gap-3 mb-6">
+        <div class="bg-white rounded-xl p-3 text-center shadow-sm">
+          <p class="text-2xl font-bold text-navy" id="stat-visits">-</p>
+          <p class="text-xs text-gray-500">Visits</p>
+        </div>
+        <div class="bg-white rounded-xl p-3 text-center shadow-sm">
+          <p class="text-2xl font-bold text-navy" id="stat-sends">-</p>
+          <p class="text-xs text-gray-500">Sends</p>
+        </div>
+        <div class="bg-white rounded-xl p-3 text-center shadow-sm">
+          <p class="text-2xl font-bold text-navy" id="stat-fav-grade">-</p>
+          <p class="text-xs text-gray-500">Fav Grade</p>
+        </div>
+      </div>
+
+      <!-- New Routes -->
+      <div class="px-5">
+        <h2 class="text-lg font-semibold text-gray-800 mb-3">New Routes This Week</h2>
+        <div id="new-routes-list" class="space-y-2">
+          <p class="text-sm text-gray-400">Loading...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROUTES PAGE -->
+    <div id="page-routes" class="page fade-in">
+      <div class="px-5 pt-6 pb-3">
+        <h1 class="text-2xl font-bold text-navy">Routes</h1>
+      </div>
+
+      <!-- Filters -->
+      <div class="px-5 flex gap-2 mb-4 overflow-x-auto no-scrollbar">
+        <select id="filter-wall" onchange="renderRoutes()" class="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white flex-shrink-0">
+          <option value="">All Walls</option>
+        </select>
+        <select id="filter-grade" onchange="renderRoutes()" class="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white flex-shrink-0">
+          <option value="">All Grades</option>
+        </select>
+        <select id="filter-colour" onchange="renderRoutes()" class="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white flex-shrink-0">
+          <option value="">All Colours</option>
+        </select>
+      </div>
+
+      <div id="routes-list" class="px-5 space-y-6 pb-4">
+        <p class="text-sm text-gray-400">Loading...</p>
+      </div>
+    </div>
+
+    <!-- LOGBOOK PAGE -->
+    <div id="page-logbook" class="page fade-in">
+      <div class="px-5 pt-6 pb-3">
+        <h1 class="text-2xl font-bold text-navy">Logbook</h1>
+      </div>
+
+      <!-- Logbook Stats -->
+      <div class="px-5 grid grid-cols-3 gap-3 mb-4">
+        <div class="bg-white rounded-xl p-3 text-center shadow-sm">
+          <p class="text-xl font-bold text-navy" id="log-total">-</p>
+          <p class="text-xs text-gray-500">Total Sends</p>
+        </div>
+        <div class="bg-white rounded-xl p-3 text-center shadow-sm">
+          <p class="text-xl font-bold text-navy" id="log-highest">-</p>
+          <p class="text-xs text-gray-500">Highest</p>
+        </div>
+        <div class="bg-white rounded-xl p-3 text-center shadow-sm">
+          <p class="text-xl font-bold text-navy" id="log-month">-</p>
+          <p class="text-xs text-gray-500">This Month</p>
+        </div>
+      </div>
+
+      <!-- Progression Chart -->
+      <div class="px-5 mb-4">
+        <canvas id="progression-chart" class="w-full" height="120" style="display:none;"></canvas>
+      </div>
+
+      <div id="logbook-list" class="px-5 space-y-2 pb-4">
+        <p class="text-sm text-gray-400">Loading...</p>
+      </div>
+    </div>
+
+    <!-- PROFILE PAGE -->
+    <div id="page-profile" class="page fade-in">
+      <div class="px-5 pt-6 pb-3">
+        <h1 class="text-2xl font-bold text-navy">Profile</h1>
+      </div>
+
+      <div class="px-5">
+        <!-- Member Card -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm mb-4">
+          <div class="flex items-center gap-4 mb-4">
+            <div class="w-14 h-14 bg-navy rounded-full flex items-center justify-center text-white text-xl font-bold" id="profile-initials"></div>
+            <div>
+              <p class="font-semibold text-lg" id="profile-name"></p>
+              <p class="text-gray-500 text-sm" id="profile-email"></p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-400" id="profile-since"></p>
+        </div>
+
+        <!-- QR Code -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm mb-4 text-center">
+          <p class="text-sm font-medium text-gray-700 mb-3">Your QR Code</p>
+          <div id="profile-qr" class="flex justify-center">
+            <p class="text-sm text-gray-400">Loading...</p>
+          </div>
+        </div>
+
+        <!-- Recent Visits -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm mb-4">
+          <p class="text-sm font-medium text-gray-700 mb-3">Recent Visits</p>
+          <div id="profile-visits" class="space-y-2">
+            <p class="text-sm text-gray-400">Loading...</p>
+          </div>
+        </div>
+
+        <!-- Logout -->
+        <button onclick="logout()" class="w-full py-3 text-red-500 font-medium text-sm border border-red-200 rounded-xl hover:bg-red-50 transition mb-8">
+          Log Out
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══════════ BOTTOM NAV ═══════════ -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 max-w-lg mx-auto">
+      <div class="flex justify-around py-2">
+        <button class="nav-item active flex flex-col items-center py-1 px-3" data-page="home">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955a1.126 1.126 0 0 1 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/>
+          </svg>
+          <span class="text-xs mt-0.5">Home</span>
+        </button>
+        <button class="nav-item flex flex-col items-center py-1 px-3 text-gray-400" data-page="routes">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z"/>
+          </svg>
+          <span class="text-xs mt-0.5">Routes</span>
+        </button>
+        <button class="nav-item flex flex-col items-center py-1 px-3 text-gray-400" data-page="logbook">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/>
+          </svg>
+          <span class="text-xs mt-0.5">Logbook</span>
+        </button>
+        <button class="nav-item flex flex-col items-center py-1 px-3 text-gray-400" data-page="profile">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/>
+          </svg>
+          <span class="text-xs mt-0.5">Profile</span>
+        </button>
+      </div>
+      <!-- iPhone safe area -->
+      <div class="h-[env(safe-area-inset-bottom)]"></div>
+    </nav>
+  </div>
+
+  <!-- ═══════════ SEND MODAL ═══════════ -->
+  <div id="send-modal" class="fixed inset-0 bg-black/50 z-50 flex items-end justify-center hidden">
+    <div class="bg-white rounded-t-2xl w-full max-w-lg p-5 pb-8">
+      <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════
+    // STATE
+    // ═══════════════════════════════════════════════════════════
+    let token = localStorage.getItem('boulderryn_token');
+    let member = JSON.parse(localStorage.getItem('boulderryn_member') || 'null');
+    let allRoutes = [];
+    let loginEmail = '';
+
+    const API = '/api/climber';
+
+    // ═══════════════════════════════════════════════════════════
+    // API HELPER
+    // ═══════════════════════════════════════════════════════════
+    async function api(path, opts = {}) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API}${path}`, { ...opts, headers });
+      const data = await res.json();
+      if (res.status === 401 && path !== '/auth/verify-code' && path !== '/auth/request-code') {
+        logout();
+        return null;
+      }
+      if (!res.ok) throw { status: res.status, ...data };
+      return data;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // AUTH
+    // ═══════════════════════════════════════════════════════════
+    async function requestCode() {
+      const emailEl = document.getElementById('login-email');
+      const btn = document.getElementById('send-code-btn');
+      const errEl = document.getElementById('email-error');
+      loginEmail = emailEl.value.trim();
+      if (!loginEmail) { showError(errEl, 'Enter your email'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      errEl.classList.add('hidden');
+
+      try {
+        await api('/auth/request-code', { method: 'POST', body: JSON.stringify({ email: loginEmail }) });
+        document.getElementById('email-step').classList.add('hidden');
+        document.getElementById('code-step').classList.remove('hidden');
+        document.getElementById('sent-to-email').textContent = loginEmail;
+        document.querySelectorAll('.code-input')[0].focus();
+      } catch (err) {
+        showError(errEl, err.error || 'Failed to send code');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send Login Code';
+      }
+    }
+
+    async function verifyCode() {
+      const inputs = document.querySelectorAll('.code-input');
+      const code = Array.from(inputs).map(i => i.value).join('');
+      const btn = document.getElementById('verify-btn');
+      const errEl = document.getElementById('code-error');
+
+      if (code.length !== 6) { showError(errEl, 'Enter all 6 digits'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+      errEl.classList.add('hidden');
+
+      try {
+        const data = await api('/auth/verify-code', { method: 'POST', body: JSON.stringify({ email: loginEmail, code }) });
+        token = data.token;
+        member = data.member;
+        localStorage.setItem('boulderryn_token', token);
+        localStorage.setItem('boulderryn_member', JSON.stringify(member));
+        showApp();
+      } catch (err) {
+        showError(errEl, err.error || 'Invalid code');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Verify';
+      }
+    }
+
+    function backToEmail() {
+      document.getElementById('email-step').classList.remove('hidden');
+      document.getElementById('code-step').classList.add('hidden');
+      document.querySelectorAll('.code-input').forEach(i => i.value = '');
+    }
+
+    function logout() {
+      token = null;
+      member = null;
+      localStorage.removeItem('boulderryn_token');
+      localStorage.removeItem('boulderryn_member');
+      document.getElementById('app-shell').classList.add('hidden');
+      document.getElementById('login-page').classList.remove('hidden');
+      backToEmail();
+    }
+
+    function showError(el, msg) {
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // CODE INPUT HANDLING
+    // ═══════════════════════════════════════════════════════════
+    document.querySelectorAll('.code-input').forEach((input, idx, all) => {
+      input.addEventListener('input', (e) => {
+        const val = e.target.value.replace(/\D/g, '');
+        e.target.value = val.slice(0, 1);
+        if (val && idx < 5) all[idx + 1].focus();
+        if (idx === 5 && val) verifyCode();
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !e.target.value && idx > 0) {
+          all[idx - 1].focus();
+          all[idx - 1].value = '';
+        }
+      });
+      input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const pasted = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+        pasted.split('').forEach((ch, i) => { if (all[i]) all[i].value = ch; });
+        if (pasted.length === 6) verifyCode();
+      });
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // NAVIGATION
+    // ═══════════════════════════════════════════════════════════
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.addEventListener('click', () => navigate(btn.dataset.page));
+    });
+
+    function navigate(page) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(`page-${page}`).classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(n => {
+        n.classList.toggle('active', n.dataset.page === page);
+        n.classList.toggle('text-gray-400', n.dataset.page !== page);
+      });
+      if (page === 'home') loadHome();
+      if (page === 'routes') loadRoutes();
+      if (page === 'logbook') loadLogbook();
+      if (page === 'profile') loadProfile();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // APP INIT
+    // ═══════════════════════════════════════════════════════════
+    function showApp() {
+      document.getElementById('login-page').classList.add('hidden');
+      document.getElementById('app-shell').classList.remove('hidden');
+      loadHome();
+    }
+
+    if (token && member) {
+      showApp();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // HOME
+    // ═══════════════════════════════════════════════════════════
+    async function loadHome() {
+      document.getElementById('home-name').textContent = member?.first_name || 'Climber';
+
+      try {
+        const stats = await api('/stats');
+        if (!stats) return;
+        document.getElementById('stat-visits').textContent = stats.total_visits || 0;
+        document.getElementById('stat-sends').textContent = stats.total_sends || 0;
+        document.getElementById('stat-fav-grade').textContent = stats.favourite_grade || '-';
+      } catch (e) { console.error('Stats:', e); }
+
+      try {
+        const routes = await api('/routes');
+        if (!routes) return;
+        const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+        const newRoutes = routes.filter(r => r.date_set >= weekAgo).slice(0, 5);
+        const el = document.getElementById('new-routes-list');
+
+        if (newRoutes.length === 0) {
+          el.innerHTML = '<p class="text-sm text-gray-400">No new routes this week</p>';
+        } else {
+          el.innerHTML = newRoutes.map(r => `
+            <div class="bg-white rounded-xl p-3 shadow-sm flex items-center gap-3">
+              <div class="w-3 h-8 rounded-full" style="background:${colourHex(r.colour)}"></div>
+              <div class="flex-1 min-w-0">
+                <p class="font-semibold text-sm">${r.grade} <span class="font-normal text-gray-500">${r.colour}</span></p>
+                <p class="text-xs text-gray-400">${r.wall_name}${r.setter ? ' · ' + r.setter : ''}</p>
+              </div>
+              ${r.sent ? '<span class="text-green-500 text-lg">✓</span>' : ''}
+            </div>
+          `).join('');
+        }
+      } catch (e) { console.error('New routes:', e); }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ROUTES
+    // ═══════════════════════════════════════════════════════════
+    async function loadRoutes() {
+      try {
+        allRoutes = await api('/routes') || [];
+        populateFilters();
+        renderRoutes();
+      } catch (e) { console.error('Routes:', e); }
+    }
+
+    function populateFilters() {
+      const walls = [...new Set(allRoutes.map(r => r.wall_name))];
+      const grades = [...new Set(allRoutes.map(r => r.grade))].sort(gradeSort);
+      const colours = [...new Set(allRoutes.map(r => r.colour))].sort();
+
+      fillSelect('filter-wall', walls);
+      fillSelect('filter-grade', grades);
+      fillSelect('filter-colour', colours);
+    }
+
+    function fillSelect(id, options) {
+      const sel = document.getElementById(id);
+      const current = sel.value;
+      const first = sel.options[0].outerHTML;
+      sel.innerHTML = first + options.map(o => `<option value="${o}">${o}</option>`).join('');
+      sel.value = current;
+    }
+
+    function gradeSort(a, b) {
+      const order = ['VB','V0','V1','V2','V3','V4','V5','V6','V7','V8','V9','V10','V11','V12'];
+      return order.indexOf(a) - order.indexOf(b);
+    }
+
+    function renderRoutes() {
+      const wall = document.getElementById('filter-wall').value;
+      const grade = document.getElementById('filter-grade').value;
+      const colour = document.getElementById('filter-colour').value;
+
+      let filtered = allRoutes;
+      if (wall) filtered = filtered.filter(r => r.wall_name === wall);
+      if (grade) filtered = filtered.filter(r => r.grade === grade);
+      if (colour) filtered = filtered.filter(r => r.colour === colour);
+
+      // Group by wall
+      const grouped = {};
+      filtered.forEach(r => {
+        if (!grouped[r.wall_name]) grouped[r.wall_name] = [];
+        grouped[r.wall_name].push(r);
+      });
+
+      const el = document.getElementById('routes-list');
+      if (Object.keys(grouped).length === 0) {
+        el.innerHTML = '<p class="text-sm text-gray-400">No routes match your filters</p>';
+        return;
+      }
+
+      el.innerHTML = Object.entries(grouped).map(([wallName, climbs]) => `
+        <div>
+          <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">${wallName}</h3>
+          <div class="space-y-2">
+            ${climbs.map(c => `
+              <div class="climb-card bg-white rounded-xl p-3 shadow-sm flex items-center gap-3 cursor-pointer transition" onclick="showClimbModal('${c.id}')">
+                <div class="w-3 h-10 rounded-full flex-shrink-0" style="background:${colourHex(c.colour)}"></div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold">${c.grade} <span class="font-normal text-gray-500">${c.colour}</span></p>
+                  <p class="text-xs text-gray-400">${formatDate(c.date_set)}${c.setter ? ' · ' + c.setter : ''}</p>
+                </div>
+                ${c.sent
+                  ? `<div class="text-right flex-shrink-0"><span class="text-green-500 font-bold">✓</span><p class="text-xs text-gray-400">${formatDate(c.sent_at)}</p></div>`
+                  : '<span class="text-gray-300 text-sm">Tap to log</span>'}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showClimbModal(climbId) {
+      const climb = allRoutes.find(r => r.id === climbId);
+      if (!climb) return;
+      const modal = document.getElementById('send-modal');
+      const content = document.getElementById('modal-content');
+
+      content.innerHTML = `
+        <div class="text-center mb-4">
+          <div class="w-4 h-12 rounded-full mx-auto mb-3" style="background:${colourHex(climb.colour)}"></div>
+          <h2 class="text-xl font-bold">${climb.grade} ${climb.colour}</h2>
+          <p class="text-gray-500 text-sm">${climb.wall_name}${climb.setter ? ' · Set by ' + climb.setter : ''}</p>
+          <p class="text-gray-400 text-xs mt-1">Set ${formatDate(climb.date_set)}</p>
+        </div>
+        ${climb.sent
+          ? `<div class="bg-green-50 border border-green-200 rounded-xl p-4 text-center mb-3">
+               <p class="text-green-700 font-medium">Sent on ${formatDate(climb.sent_at)}</p>
+             </div>
+             <button onclick="removeSend('${climb.id}')" class="send-btn w-full py-3 border border-red-200 text-red-500 rounded-xl font-medium transition">Remove Send</button>`
+          : `<button onclick="logSend('${climb.id}')" class="send-btn w-full py-3 bg-navy text-white rounded-xl font-semibold transition">Log Send</button>`
+        }
+        <button onclick="closeModal()" class="w-full py-3 text-gray-500 text-sm mt-2">Cancel</button>
+      `;
+      modal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('send-modal').classList.add('hidden');
+    }
+
+    async function logSend(climbId) {
+      try {
+        await api(`/routes/${climbId}/send`, { method: 'POST', body: '{}' });
+        closeModal();
+        loadRoutes();
+      } catch (e) {
+        if (e.status === 409) { closeModal(); loadRoutes(); }
+        else alert(e.error || 'Failed to log send');
+      }
+    }
+
+    async function removeSend(climbId) {
+      try {
+        await api(`/routes/${climbId}/send`, { method: 'DELETE' });
+        closeModal();
+        loadRoutes();
+      } catch (e) { alert(e.error || 'Failed to remove send'); }
+    }
+
+    // Close modal on backdrop click
+    document.getElementById('send-modal').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeModal();
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // LOGBOOK
+    // ═══════════════════════════════════════════════════════════
+    async function loadLogbook() {
+      try {
+        const [logbook, stats] = await Promise.all([api('/logbook'), api('/stats')]);
+        if (!logbook || !stats) return;
+
+        document.getElementById('log-total').textContent = stats.total_sends || 0;
+        document.getElementById('log-highest').textContent = stats.highest_grade || '-';
+        document.getElementById('log-month').textContent = stats.sends_this_month || 0;
+
+        // Progression chart
+        if (stats.progression && stats.progression.length > 1) {
+          drawProgressionChart(stats.progression);
+        }
+
+        const el = document.getElementById('logbook-list');
+        if (logbook.length === 0) {
+          el.innerHTML = '<p class="text-sm text-gray-400 text-center py-8">No sends yet. Get climbing!</p>';
+          return;
+        }
+
+        el.innerHTML = logbook.map(s => `
+          <div class="bg-white rounded-xl p-3 shadow-sm flex items-center gap-3">
+            <div class="w-3 h-8 rounded-full" style="background:${colourHex(s.colour)}"></div>
+            <div class="flex-1">
+              <p class="font-semibold text-sm">${s.grade} <span class="font-normal text-gray-500">${s.colour}</span></p>
+              <p class="text-xs text-gray-400">${s.wall_name}${s.setter ? ' · ' + s.setter : ''}</p>
+            </div>
+            <p class="text-xs text-gray-400">${formatDate(s.sent_at)}</p>
+          </div>
+        `).join('');
+      } catch (e) { console.error('Logbook:', e); }
+    }
+
+    function drawProgressionChart(data) {
+      const canvas = document.getElementById('progression-chart');
+      canvas.style.display = 'block';
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width = canvas.offsetWidth * 2;
+      const H = canvas.height = 240;
+      ctx.clearRect(0, 0, W, H);
+
+      const grades = ['VB','V0','V1','V2','V3','V4','V5','V6','V7','V8','V9','V10'];
+      const toY = (g) => H - 40 - ((grades.indexOf(g) / (grades.length - 1)) * (H - 60));
+      const pad = 60;
+
+      // Draw lines
+      ctx.strokeStyle = '#1E3A5F';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      data.forEach((d, i) => {
+        const x = pad + (i / (data.length - 1)) * (W - pad * 2);
+        const y = toY(d.highest_grade);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      // Draw dots & labels
+      ctx.fillStyle = '#1E3A5F';
+      ctx.font = '20px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      data.forEach((d, i) => {
+        const x = pad + (i / (data.length - 1)) * (W - pad * 2);
+        const y = toY(d.highest_grade);
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#6B7280';
+        ctx.fillText(d.month.slice(5), x, H - 10);
+        ctx.fillStyle = '#1E3A5F';
+        ctx.fillText(d.highest_grade, x, y - 14);
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // PROFILE
+    // ═══════════════════════════════════════════════════════════
+    async function loadProfile() {
+      if (!member) return;
+      document.getElementById('profile-name').textContent = `${member.first_name} ${member.last_name}`;
+      document.getElementById('profile-email').textContent = member.email;
+      document.getElementById('profile-initials').textContent = (member.first_name?.[0] || '') + (member.last_name?.[0] || '');
+      document.getElementById('profile-since').textContent = `Member since ${formatDate(member.created_at)}`;
+
+      // QR code
+      try {
+        const me = await api('/me');
+        if (me && me.id) {
+          const qrEl = document.getElementById('profile-qr');
+          qrEl.innerHTML = `<img src="/api/members/${me.id}/qr-code" alt="QR Code" class="w-48 h-48 rounded-lg">`;
+        }
+      } catch (e) { console.error('QR:', e); }
+
+      // Visits
+      try {
+        const visits = await api('/visits');
+        if (!visits) return;
+        const el = document.getElementById('profile-visits');
+        if (visits.length === 0) {
+          el.innerHTML = '<p class="text-sm text-gray-400">No visits yet</p>';
+        } else {
+          el.innerHTML = visits.slice(0, 10).map(v => `
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-600">${formatDateTime(v.checked_in_at)}</span>
+              <span class="text-gray-400">${v.method === 'qr_scan' ? 'QR Scan' : 'Desk'}</span>
+            </div>
+          `).join('');
+        }
+      } catch (e) { console.error('Visits:', e); }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // UTILITIES
+    // ═══════════════════════════════════════════════════════════
+    function colourHex(colour) {
+      const map = {
+        'Black': '#1a1a1a', 'White': '#e5e5e5', 'Yellow': '#EAB308', 'Green': '#22C55E',
+        'Blue': '#3B82F6', 'Red': '#EF4444', 'Purple': '#8B5CF6', 'Orange': '#F97316',
+        'Pink': '#EC4899', 'Mint': '#34D399', 'Teal': '#14B8A6', 'Grey': '#9CA3AF',
+        'Brown': '#92400E', 'Neon Green': '#84CC16', 'Neon Pink': '#F472B6',
+      };
+      return map[colour] || '#6B7280';
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function formatDateTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+  </script>
+</body>
+</html>
