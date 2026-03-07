@@ -2179,28 +2179,92 @@ async function _doEditMemberModal(memberId, activeTab = 'edit') {
       ${t.label}
     </button>`).join('');
 
+  // DOB dropdowns
+  const dobDate = m.date_of_birth ? new Date(m.date_of_birth) : null;
+  const dobDay = dobDate ? dobDate.getUTCDate() : '';
+  const dobMonth = dobDate ? dobDate.getUTCMonth() + 1 : '';
+  const dobYear = dobDate ? dobDate.getUTCFullYear() : '';
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dayOpts = ['<option value="">Day</option>', ...Array.from({length:31},(_,i)=>`<option value="${i+1}" ${dobDay===i+1?'selected':''}>${i+1}</option>`)].join('');
+  const monthOpts = ['<option value="">Month</option>', ...months.map((mo,i)=>`<option value="${i+1}" ${dobMonth===i+1?'selected':''}>${mo}</option>`)].join('');
+  const currentYear = new Date().getFullYear();
+  const yearOpts = ['<option value="">Year</option>', ...Array.from({length:100},(_,i)=>currentYear-i).map(y=>`<option value="${y}" ${dobYear===y?'selected':''}>${y}</option>`)].join('');
+
   const editFormHtml = `
+    <div class="flex items-center gap-2 mb-4">
+      <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+      <span class="text-sm font-bold text-gray-700">Edit Profile</span>
+    </div>
     <form id="edit-member-form" onsubmit="updateMember(event, '${m.id}')">
-      <div class="grid grid-cols-2 gap-4">
-        <div class="form-group"><label class="form-label">First Name *</label><input type="text" name="first_name" class="form-input" value="${m.first_name || ''}" required></div>
-        <div class="form-group"><label class="form-label">Last Name *</label><input type="text" name="last_name" class="form-input" value="${m.last_name || ''}" required></div>
-        <div class="form-group"><label class="form-label">Email</label><input type="email" name="email" class="form-input" value="${m.email || ''}"></div>
-        <div class="form-group"><label class="form-label">Phone</label><input type="tel" name="phone" class="form-input" value="${m.phone || ''}"></div>
-        <div class="form-group"><label class="form-label">Date of Birth</label><input type="date" name="date_of_birth" class="form-input" value="${m.date_of_birth || ''}"></div>
-        <div class="form-group"><label class="form-label">Gender</label><select name="gender" class="form-select"><option value="">—</option><option value="male" ${m.gender==='male'?'selected':''}>Male</option><option value="female" ${m.gender==='female'?'selected':''}>Female</option><option value="other" ${m.gender==='other'?'selected':''}>Other</option><option value="prefer_not_to_say" ${m.gender==='prefer_not_to_say'?'selected':''}>Prefer not to say</option></select></div>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-[#1E3A5F] mb-1">First Name</label>
+          <div class="relative">
+            <input type="text" name="first_name" class="form-input pr-10" value="${m.first_name || ''}" required oninput="checkEditDuplicate('${m.id}', this)">
+            <span id="edit-dupe-badge" class="hidden absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 bg-red-500 text-white text-xs font-bold rounded cursor-pointer" onclick="editModalTab('${m.id}', 'merge')" title="Possible duplicate — click to merge">···</span>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-[#1E3A5F] mb-1">Middle Name</label>
+          <input type="text" name="middle_name" class="form-input" value="${m.middle_name || ''}">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-[#1E3A5F] mb-1">Last Name</label>
+          <input type="text" name="last_name" class="form-input" value="${m.last_name || ''}" required>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-[#1E3A5F] mb-1">Telephone</label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm">🇬🇧</span>
+            <input type="tel" name="phone" class="form-input pl-9" value="${m.phone || ''}">
+            <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-[#1E3A5F] mb-1">Address</label>
+          <textarea name="address_line1" class="form-input" rows="2" placeholder="1 Dunstan Close, Penryn, Cornwall, TR10 8RY">${[m.address_line1, m.address_line2, m.city, m.region, m.postal_code].filter(Boolean).join(', ')}</textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-[#1E3A5F] mb-1">Email *</label>
+          <input type="email" name="email" class="form-input" value="${m.email || ''}" required>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-[#1E3A5F] mb-1">Gender</label>
+          <select name="gender" class="form-select">
+            <option value="">—</option>
+            <option value="male" ${m.gender==='male'?'selected':''}>Male</option>
+            <option value="female" ${m.gender==='female'?'selected':''}>Female</option>
+            <option value="other" ${m.gender==='other'?'selected':''}>Other</option>
+            <option value="prefer_not_to_say" ${m.gender==='prefer_not_to_say'?'selected':''}>Prefer not to say</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-[#1E3A5F] mb-1">Date of Birth</label>
+          <div class="grid grid-cols-3 gap-2">
+            <select name="dob_day" class="form-select text-sm">${dayOpts}</select>
+            <select name="dob_month" class="form-select text-sm">${monthOpts}</select>
+            <select name="dob_year" class="form-select text-sm">${yearOpts}</select>
+          </div>
+          <p class="text-xs text-gray-400 mt-1">birthdate</p>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-[#1E3A5F] mb-1">Emergency Contact</label>
+          <div class="grid grid-cols-2 gap-2">
+            <input type="text" name="emergency_contact_name" class="form-input" placeholder="Name" value="${m.emergency_contact_name || ''}">
+            <input type="tel" name="emergency_contact_phone" class="form-input" placeholder="Phone" value="${m.emergency_contact_phone || ''}">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-[#1E3A5F] mb-1">Medical Conditions</label>
+          <input type="text" name="medical_conditions" class="form-input" value="${m.medical_conditions || ''}">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-[#1E3A5F] mb-1">Notes</label>
+          <textarea name="notes" class="form-input" rows="2">${m.notes || ''}</textarea>
+        </div>
       </div>
-      <div class="form-group"><label class="form-label">Address Line 1</label><input type="text" name="address_line1" class="form-input mb-2" placeholder="Address Line 1" value="${m.address_line1 || ''}"></div>
-      <div class="form-group"><label class="form-label">Address Line 2</label><input type="text" name="address_line2" class="form-input mb-2" placeholder="Address Line 2" value="${m.address_line2 || ''}"></div>
-      <div class="grid grid-cols-3 gap-2 mb-4"><input type="text" name="city" class="form-input" placeholder="City" value="${m.city || ''}"><input type="text" name="region" class="form-input" placeholder="County" value="${m.region || ''}"><input type="text" name="postal_code" class="form-input" placeholder="Postcode" value="${m.postal_code || ''}"></div>
-      <div class="grid grid-cols-2 gap-4">
-        <div class="form-group"><label class="form-label">Emergency Contact Name</label><input type="text" name="emergency_contact_name" class="form-input" value="${m.emergency_contact_name || ''}"></div>
-        <div class="form-group"><label class="form-label">Emergency Contact Phone</label><input type="tel" name="emergency_contact_phone" class="form-input" value="${m.emergency_contact_phone || ''}"></div>
-      </div>
-      <div class="form-group"><label class="form-label">Medical Conditions</label><input type="text" name="medical_conditions" class="form-input" value="${m.medical_conditions || ''}"></div>
-      <div class="form-group"><label class="form-label">Notes</label><textarea name="notes" class="form-input" rows="2">${m.notes || ''}</textarea></div>
-      <div class="flex justify-end gap-2 mt-6">
-        <button type="button" onclick="openMemberProfile('${m.id}')" class="btn btn-secondary">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Changes</button>
+      <div class="flex justify-end mt-5">
+        <button type="submit" class="btn btn-primary px-6">Submit</button>
       </div>
     </form>`;
 
@@ -2423,12 +2487,45 @@ async function removeFamilyLink(memberId, linkedId) {
 async function updateMember(e, memberId) {
   e.preventDefault();
   const form = document.getElementById('edit-member-form');
-  const data = Object.fromEntries(new FormData(form));
+  const raw = Object.fromEntries(new FormData(form));
+
+  // Reconstruct DOB from dropdowns
+  if (raw.dob_day && raw.dob_month && raw.dob_year) {
+    const d = String(raw.dob_day).padStart(2,'0');
+    const mo = String(raw.dob_month).padStart(2,'0');
+    raw.date_of_birth = `${raw.dob_year}-${mo}-${d}`;
+  }
+  delete raw.dob_day; delete raw.dob_month; delete raw.dob_year;
+
+  // Address: if user typed in the combined field, store it in address_line1 and clear others
+  // (address_line1 textarea holds formatted address)
+  // Keep address_line1 as-is, blank out the sub-fields that are no longer shown
+  raw.address_line2 = raw.address_line2 || '';
+  raw.city = raw.city || '';
+  raw.region = raw.region || '';
+  raw.postal_code = raw.postal_code || '';
+
   try {
-    await api('PUT', `/api/members/${memberId}`, data);
-    showToast('Member updated', 'success');
+    await api('PUT', `/api/members/${memberId}`, raw);
+    showToast('Saved', 'success');
     await openMemberProfile(memberId);
   } catch (err) { showToast('Error: ' + err.message, 'error'); }
+}
+
+let _dupeCheckTimer = null;
+async function checkEditDuplicate(currentId, input) {
+  clearTimeout(_dupeCheckTimer);
+  const badge = document.getElementById('edit-dupe-badge');
+  if (!badge || !input.value || input.value.length < 2) { badge?.classList.add('hidden'); return; }
+  _dupeCheckTimer = setTimeout(async () => {
+    try {
+      const lastName = document.querySelector('#edit-member-form [name=last_name]')?.value || '';
+      const q = input.value + (lastName ? ' ' + lastName : '');
+      const res = await api('GET', `/api/members/search?q=${encodeURIComponent(q)}&limit=5`);
+      const dupes = (res.members || res || []).filter(m => m.id !== currentId);
+      badge.classList.toggle('hidden', dupes.length === 0);
+    } catch(e) { badge.classList.add('hidden'); }
+  }, 500);
 }
 
 // ============================================================
