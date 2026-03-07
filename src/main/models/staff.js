@@ -19,7 +19,21 @@ function verifyPassword(password, stored) {
 }
 
 function hashPin(pin) {
-  return crypto.createHash('sha256').update(pin).digest('hex');
+  // Salted PBKDF2 — same as password hashing, prevents rainbow table attacks on short PINs
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(String(pin), salt, 10000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPin(pin, stored) {
+  if (!stored) return false;
+  // Legacy: plain SHA256 (no colon separator) — migrate on first successful auth
+  if (!stored.includes(':')) {
+    return crypto.createHash('sha256').update(String(pin)).digest('hex') === stored;
+  }
+  const [salt, hash] = stored.split(':');
+  const verify = crypto.pbkdf2Sync(String(pin), salt, 10000, 64, 'sha512').toString('hex');
+  return hash === verify;
 }
 
 // Role display names
@@ -148,9 +162,14 @@ const Staff = {
    */
   authenticateByPin(pin) {
     const db = getDb();
-    const pinHash = hashPin(pin);
-    const staff = db.prepare('SELECT * FROM staff WHERE pin_hash = ? AND is_active = 1').get(pinHash);
+    // Salted hash means we can't use WHERE — fetch active staff and verify each
+    const allStaff = db.prepare('SELECT * FROM staff WHERE is_active = 1').all();
+    const staff = allStaff.find(s => verifyPin(pin, s.pin_hash));
     if (!staff) return null;
+    // Migrate legacy unsalted SHA256 PIN to salted PBKDF2 on successful auth
+    if (staff.pin_hash && !staff.pin_hash.includes(':')) {
+      db.prepare('UPDATE staff SET pin_hash = ? WHERE id = ?').run(hashPin(pin), staff.id);
+    }
     staff.permissions = JSON.parse(staff.permissions_json || '{}');
     delete staff.password_hash;
     delete staff.pin_hash;

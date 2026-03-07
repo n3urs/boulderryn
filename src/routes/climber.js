@@ -10,7 +10,10 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const { getDb } = require('../main/database/db');
 
-const JWT_SECRET = 'boulderryn-climber-secret-2026';
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  console.warn('[SECURITY] JWT_SECRET not set in environment — using insecure fallback. Set JWT_SECRET in /etc/boulderryn.env');
+  return 'boulderryn-climber-secret-2026-CHANGE-ME';
+})();
 const JWT_EXPIRES = '30d';
 const CODE_EXPIRY_MINUTES = 10;
 
