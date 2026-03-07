@@ -110,4 +110,40 @@ router.get('/checkins-daily', (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// End of Day report
+router.get('/eod', (req, res, next) => {
+  try {
+    const db = getDb();
+    const date = req.query.date || new Date().toISOString().split('T')[0];
+
+    const totalRevenue = db.prepare(`SELECT COALESCE(SUM(total_amount),0) as total FROM transactions WHERE date(created_at)=? AND payment_status='completed'`).get(date)?.total || 0;
+    const totalTransactions = db.prepare(`SELECT COUNT(*) as c FROM transactions WHERE date(created_at)=? AND payment_status='completed'`).get(date)?.c || 0;
+    const totalCheckIns = db.prepare(`SELECT COUNT(*) as c FROM check_ins WHERE date(checked_in_at)=?`).get(date)?.c || 0;
+    const newMembers = db.prepare(`SELECT COUNT(*) as c FROM members WHERE date(created_at)=?`).get(date)?.c || 0;
+
+    const methodRows = db.prepare(`
+      SELECT payment_method, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount
+      FROM transactions WHERE date(created_at)=? AND payment_status='completed'
+      GROUP BY payment_method
+    `).all(date);
+    const byMethod = {};
+    methodRows.forEach(r => { byMethod[r.payment_method] = { count: r.count, amount: r.amount }; });
+
+    const topProducts = db.prepare(`
+      SELECT ti.description as name, SUM(ti.quantity) as qty, SUM(ti.total_price) as revenue
+      FROM transaction_items ti
+      JOIN transactions t ON ti.transaction_id = t.id
+      WHERE date(t.created_at)=? AND t.payment_status='completed'
+      GROUP BY ti.description
+      ORDER BY revenue DESC LIMIT 8
+    `).all(date);
+
+    const checkInMethods = db.prepare(`
+      SELECT method, COUNT(*) as count FROM check_ins WHERE date(checked_in_at)=? GROUP BY method ORDER BY count DESC
+    `).all(date);
+
+    res.json({ date, totalRevenue, totalTransactions, totalCheckIns, newMembers, byMethod, topProducts, checkInMethods });
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

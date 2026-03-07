@@ -1099,13 +1099,11 @@ async function exportMembersCSV() {
     const members = result.members || [];
     if (members.length === 0) { showToast('No members to export', 'error'); return; }
 
-    const headers = ['First Name','Last Name','Email','Phone','DOB','Gender','Address','City','County','Postcode','Registration Fee Paid','Waiver Status','Joined Date'];
+    const headers = ['First Name','Last Name','Email','Phone','DOB','Gender','Address','City','County','Postcode','Registration Fee Paid','Waiver Signed','Active Pass','Emergency Contact','Emergency Phone','Medical Notes','Joined Date'];
     const escapeCSV = (val) => {
       if (val == null) return '';
       const str = String(val);
-      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-        return '"' + str.replace(/"/g, '""') + '"';
-      }
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) return '"' + str.replace(/"/g, '""') + '"';
       return str;
     };
 
@@ -1116,12 +1114,16 @@ async function exportMembersCSV() {
       escapeCSV(m.phone),
       escapeCSV(m.date_of_birth),
       escapeCSV(m.gender),
-      escapeCSV(m.address_line1),
+      escapeCSV([m.address_line1, m.address_line2].filter(Boolean).join(', ')),
       escapeCSV(m.city),
       escapeCSV(m.region),
       escapeCSV(m.postal_code),
       m.registration_fee_paid ? 'Yes' : 'No',
-      '—',
+      m.waiver_valid ? 'Yes' : 'No',
+      m.has_valid_pass ? (m.active_pass?.pass_name || 'Yes') : 'No',
+      escapeCSV(m.emergency_contact_name),
+      escapeCSV(m.emergency_contact_phone),
+      escapeCSV(m.medical_conditions),
       m.created_at ? new Date(m.created_at).toLocaleDateString('en-GB') : ''
     ].join(','));
 
@@ -3260,6 +3262,21 @@ async function loadAnalytics() {
       </div>
     </div>
 
+    <!-- End of Day Report -->
+    <div class="bg-white border border-gray-200 rounded-xl p-4 mb-6" id="analytics-eod">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-semibold text-gray-700">End of Day Report</h3>
+        <div class="flex items-center gap-2">
+          <input type="date" id="eod-date" class="text-xs border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500" value="${new Date().toISOString().split('T')[0]}" onchange="loadEodReport()">
+          <button onclick="printEodReport()" class="text-xs px-3 py-1.5 bg-[#1E3A5F] text-white rounded-lg hover:bg-[#2A4D7A] transition font-medium flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+            Print
+          </button>
+        </div>
+      </div>
+      <div id="eod-content" class="text-gray-400 text-sm text-center py-4">Loading...</div>
+    </div>
+
     <!-- Bottom Row -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div class="bg-white border border-gray-200 rounded-xl p-4" id="analytics-popular-products">
@@ -3282,6 +3299,7 @@ async function loadAnalytics() {
       api('GET', '/api/stats/popular-products?limit=10&days=30'),
       api('GET', '/api/routes/grade-distribution'),
     ]);
+    loadEodReport();
 
     // Summary cards
     const cards = document.getElementById('analytics-summary-cards');
@@ -3466,6 +3484,107 @@ function switchSettingsTab(tab) {
   if (content) content.classList.remove('hidden');
 
   loadSettingsTabContent(tab);
+}
+
+async function loadEodReport() {
+  const container = document.getElementById('eod-content');
+  if (!container) return;
+  const dateInput = document.getElementById('eod-date');
+  const date = dateInput ? dateInput.value : new Date().toISOString().split('T')[0];
+  container.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">Loading...</p>';
+
+  try {
+    const data = await api('GET', `/api/stats/eod?date=${date}`);
+    const isToday = date === new Date().toISOString().split('T')[0];
+    const dateLabel = isToday ? 'Today' : new Date(date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    const methodRow = (label, amount, count) => amount > 0 ? `
+      <div class="flex items-center justify-between py-1.5 text-sm">
+        <span class="text-gray-600">${label}</span>
+        <div class="text-right">
+          <span class="font-medium text-gray-900">£${parseFloat(amount).toFixed(2)}</span>
+          <span class="text-xs text-gray-400 ml-2">${count} txn${count !== 1 ? 's' : ''}</span>
+        </div>
+      </div>` : '';
+
+    container.innerHTML = `
+      <div id="eod-printable">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <p class="text-xs text-gray-400 uppercase font-semibold">Report for</p>
+            <p class="text-lg font-bold text-gray-900">${dateLabel}</p>
+          </div>
+          <div class="text-right">
+            <p class="text-2xl font-bold text-green-600">£${parseFloat(data.totalRevenue).toFixed(2)}</p>
+            <p class="text-xs text-gray-400">Total revenue</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 mb-4">
+          <div class="bg-blue-50 rounded-xl p-3 text-center">
+            <p class="text-2xl font-bold text-blue-600">${data.totalCheckIns}</p>
+            <p class="text-xs text-gray-500 mt-0.5">Check-ins</p>
+          </div>
+          <div class="bg-green-50 rounded-xl p-3 text-center">
+            <p class="text-2xl font-bold text-green-600">${data.totalTransactions}</p>
+            <p class="text-xs text-gray-500 mt-0.5">Transactions</p>
+          </div>
+          <div class="bg-purple-50 rounded-xl p-3 text-center">
+            <p class="text-2xl font-bold text-purple-600">${data.newMembers}</p>
+            <p class="text-xs text-gray-500 mt-0.5">New members</p>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-100 pt-3 mb-4">
+          <p class="text-xs uppercase font-bold text-gray-400 mb-2">Revenue by Payment Method</p>
+          ${methodRow('Card (Dojo)', data.byMethod?.dojo_card?.amount || 0, data.byMethod?.dojo_card?.count || 0)}
+          ${methodRow('Voucher / Gift Card', (data.byMethod?.voucher?.amount || 0) + (data.byMethod?.gift_card?.amount || 0), (data.byMethod?.voucher?.count || 0) + (data.byMethod?.gift_card?.count || 0))}
+          ${methodRow('Other', data.byMethod?.other?.amount || 0, data.byMethod?.other?.count || 0)}
+          ${data.totalRevenue == 0 ? '<p class="text-sm text-gray-400 py-2">No revenue recorded</p>' : ''}
+        </div>
+
+        ${data.topProducts?.length > 0 ? `
+        <div class="border-t border-gray-100 pt-3 mb-4">
+          <p class="text-xs uppercase font-bold text-gray-400 mb-2">Top Sellers</p>
+          ${data.topProducts.map(p => `
+            <div class="flex items-center justify-between py-1.5 text-sm">
+              <span class="text-gray-700 truncate mr-3">${p.name}</span>
+              <div class="flex-shrink-0 text-right">
+                <span class="font-medium">£${parseFloat(p.revenue).toFixed(2)}</span>
+                <span class="text-xs text-gray-400 ml-1">×${p.qty}</span>
+              </div>
+            </div>`).join('')}
+        </div>` : ''}
+
+        ${data.checkInMethods?.length > 0 ? `
+        <div class="border-t border-gray-100 pt-3">
+          <p class="text-xs uppercase font-bold text-gray-400 mb-2">Check-in Methods</p>
+          <div class="flex gap-3 flex-wrap">
+            ${data.checkInMethods.map(c => `<span class="text-sm text-gray-600">${c.method}: <strong>${c.count}</strong></span>`).join(' · ')}
+          </div>
+        </div>` : ''}
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<p class="text-sm text-red-500 text-center py-4">Failed to load: ${err.message}</p>`;
+  }
+}
+
+function printEodReport() {
+  const content = document.getElementById('eod-printable');
+  if (!content) return;
+  const dateInput = document.getElementById('eod-date');
+  const date = dateInput?.value || '';
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>BoulderRyn EOD Report ${date}</title>
+    <style>body{font-family:sans-serif;padding:2rem;max-width:600px;margin:0 auto}h2{margin-bottom:0.25rem}p{margin:0.15rem 0}.row{display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid #eee}.label{color:#666}.bold{font-weight:700}@media print{button{display:none}}</style>
+  </head><body>
+    <h2>BoulderRyn — End of Day Report</h2>
+    <p style="color:#666;margin-bottom:1.5rem">${date}</p>
+    ${content.innerHTML}
+    <script>window.onload=()=>window.print()<\/script>
+  </body></html>`);
+  w.document.close();
 }
 
 async function loadSettingsTabContent(tab) {

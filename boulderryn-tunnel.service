@@ -1,0 +1,17 @@
+[Unit]
+Description=BoulderRyn Cloudflare Tunnel
+After=network.target boulderryn.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ec2-user
+ExecStart=/usr/local/bin/cloudflared tunnel --url http://localhost:8080
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=boulderryn-tunnel
+
+[Install]
+WantedBy=multi-user.target
