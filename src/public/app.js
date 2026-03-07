@@ -1395,22 +1395,20 @@ async function openMemberProfile(memberId) {
             <button onclick="closeModal()" class="absolute top-2 right-2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
-            <div class="absolute bottom-2 right-2 relative" id="photo-btn-container">
-              <button onclick="togglePhotoMenu('${member.id}')" class="w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition" title="Change photo">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-              </button>
-              <div id="photo-menu-${member.id}" class="hidden absolute bottom-9 right-0 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 w-44">
-                <label class="flex items-center gap-2.5 px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm text-gray-700">
-                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                  Take photo
-                  <input type="file" accept="image/*" capture="environment" class="hidden" onchange="uploadMemberPhoto('${member.id}', this)">
-                </label>
-                <label class="flex items-center gap-2.5 px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm text-gray-700 border-t border-gray-100">
-                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                  Upload photo
-                  <input type="file" accept="image/*" class="hidden" onchange="uploadMemberPhoto('${member.id}', this)">
-                </label>
-              </div>
+            <button onclick="togglePhotoMenu('${member.id}')" class="absolute bottom-2 right-2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition z-10" title="Change photo">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </button>
+            <div id="photo-menu-${member.id}" class="hidden absolute bottom-12 right-2 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-20 w-44">
+              <label class="flex items-center gap-2.5 px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm text-gray-700">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Take photo
+                <input type="file" accept="image/*" capture="environment" class="hidden" onchange="uploadMemberPhoto('${member.id}', this)">
+              </label>
+              <label class="flex items-center gap-2.5 px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm text-gray-700 border-t border-gray-100">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Upload photo
+                <input type="file" accept="image/*" class="hidden" onchange="uploadMemberPhoto('${member.id}', this)">
+              </label>
             </div>
             ${isUnder18 ? `<span class="absolute top-2 left-2 px-2 py-0.5 bg-blue-500 text-white text-xs font-bold rounded-full">Under 18</span>` : ''}
             ${member.has_warning ? `<span class="absolute top-2 left-2 px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center gap-1"><svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>Warning</span>` : ''}
