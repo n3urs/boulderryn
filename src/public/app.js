@@ -2291,66 +2291,70 @@ async function _doEditMemberModal(memberId, activeTab = 'edit') {
 
   const mergeHtml = `
     <div>
-      <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-5">
-        <p class="text-sm text-red-700 font-medium leading-relaxed">
-          <strong>DANGER!</strong> Running this function will delete this profile and map all sessions, passes, transactions, and events to the target profile. This cannot be undone.
-        </p>
-      </div>
+      <h3 class="text-base font-bold text-gray-900 mb-2">Merge Profile</h3>
+      <p class="text-sm text-gray-600 mb-4 leading-relaxed">DANGER! Running this function will delete this profile and map all sessions, passes, transactions, and events to the target profile. You can only run this function when you have admin rights over both this profile and the target profile, otherwise you will need to submit a help request.</p>
 
-      <div class="flex items-center gap-3 mb-5 p-3 bg-gray-50 rounded-xl">
+      <div class="flex items-center gap-3 mb-5">
         <label class="relative inline-flex items-center cursor-pointer">
-          <input type="checkbox" id="merge-understand-toggle" class="sr-only peer" onchange="document.getElementById('merge-action-area').classList.toggle('opacity-30', !this.checked); document.getElementById('merge-submit-btn').disabled=!this.checked;">
-          <div class="w-10 h-6 bg-gray-300 rounded-full peer peer-checked:bg-blue-500 transition"></div>
-          <div class="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform"></div>
+          <input type="checkbox" id="merge-understand-toggle" class="sr-only peer" onchange="onMergeToggle(this.checked)">
+          <div class="w-11 h-6 bg-gray-300 rounded-full peer peer-checked:bg-blue-500 transition"></div>
+          <div class="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform"></div>
         </label>
-        <span class="text-sm font-semibold text-gray-700">I understand</span>
+        <span class="text-sm font-medium text-blue-600">I understand</span>
       </div>
 
-      <div id="merge-action-area" class="opacity-30 transition-opacity">
-        <div class="grid grid-cols-2 gap-6">
-          <!-- Incorrect profile (source) -->
+      <div id="merge-action-area" class="opacity-30 pointer-events-none transition-opacity">
+        <div class="grid grid-cols-[1fr_auto_1fr] gap-3 items-start mb-2">
+
           <div>
-            <p class="text-xs font-bold text-gray-500 uppercase mb-3">Incorrect Profile</p>
-            <p class="text-xs text-gray-400 mb-3">This profile will be permanently deleted. All passes, events, visits, purchases, and forms will be transferred to the target profile.</p>
-            <div class="flex items-center gap-3 p-3 border-2 border-red-200 bg-red-50 rounded-xl">
-              ${m.photo_url ? `<img src="${m.photo_url}" class="w-12 h-12 rounded-full object-cover">` : `<div class="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold" style="background:${colour}">${initials}</div>`}
-              <div class="min-w-0">
-                <p class="text-sm font-bold text-gray-900">${fullName.toUpperCase()}</p>
-                <p class="text-xs text-gray-400">${m.email || '—'}</p>
+            <p class="text-sm font-bold text-gray-800 mb-1">Incorrect Profile</p>
+            <p class="text-xs text-gray-400 mb-3">This profile will be permanently deleted. All passes, events, visits, purchases, and forms will be transferred to the target profile. This cannot be undone.</p>
+            <div class="flex items-center gap-2 p-2.5 border border-gray-200 rounded-xl">
+              ${m.photo_url ? `<img src="${m.photo_url}" class="w-11 h-11 rounded-lg object-cover flex-shrink-0">` : `<div class="w-11 h-11 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style="background:${colour}">${initials}</div>`}
+              <div class="min-w-0 flex-1">
+                <p class="text-xs font-bold text-gray-900">${fullName.toUpperCase()}</p>
+                <p class="text-xs text-gray-400 truncate">${m.email || '—'}</p>
                 <p class="text-xs text-gray-400">${dob}</p>
               </div>
-              <svg class="w-4 h-4 text-orange-400 flex-shrink-0 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+              <svg class="w-4 h-4 text-orange-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
             </div>
           </div>
 
-          <!-- Target profile search -->
+          <div class="flex flex-col items-center justify-center pt-14 gap-2">
+            <span class="text-xl font-bold text-gray-400">&raquo;</span>
+          </div>
+
           <div>
-            <p class="text-xs font-bold text-gray-500 uppercase mb-3">Target Profile</p>
+            <p class="text-sm font-bold text-gray-800 mb-1">Target Profile</p>
             <p class="text-xs text-gray-400 mb-3">This profile will get all passes, events, visits, purchases, and forms from the profile to delete.</p>
-            <div class="relative mb-3">
-              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-              <input type="text" id="merge-target-search" class="form-input pl-9" placeholder="Search by name or email..." oninput="searchMergeTarget('${m.id}', this.value)">
+            <div id="merge-target-area">
+              <div class="relative">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" id="merge-target-search" class="form-input pl-9 text-sm" placeholder="Search" oninput="searchMergeTarget('${m.id}', this.value)">
+              </div>
+              <p class="text-xs text-blue-400 mt-1 text-center">Enter at least 3 characters to search</p>
+              <div id="merge-target-results" class="mt-2 border border-gray-200 rounded-xl overflow-hidden max-h-40 overflow-y-auto hidden"></div>
             </div>
-            <div id="merge-target-results" class="border border-gray-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
-              <p class="text-xs text-gray-400 p-3 text-center">Start typing to search</p>
-            </div>
-            <div id="merge-target-selected" class="hidden mt-2 p-2 bg-blue-50 border border-blue-200 rounded-xl text-xs">
-              <span class="text-blue-700 font-semibold">Selected: </span><span id="merge-target-name" class="text-blue-600"></span>
-            </div>
-            <input type="hidden" id="merge-target-id">
           </div>
         </div>
 
-        <div class="flex justify-end mt-6">
-          <button id="merge-submit-btn" disabled onclick="submitMergeProfile('${m.id}')"
-            class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-            Merge & Delete Profile
+        <div class="flex justify-end mb-4">
+          <button type="button" onclick="swapMergeProfiles('${m.id}')" class="text-xs px-3 py-1.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition">Swap</button>
+        </div>
+
+        <input type="hidden" id="merge-target-id">
+        <input type="hidden" id="merge-source-id" value="${m.id}">
+
+        <div id="merge-preview-section" class="hidden mt-2">
+          <button type="button" onclick="toggleMergePreview()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm mb-3 transition">Merged Profile</button>
+          <div id="merge-preview-content" class="hidden border border-gray-200 rounded-xl p-4 space-y-1.5 text-sm mb-4"></div>
+          <button id="merge-submit-btn" onclick="submitMergeProfile()" disabled
+            class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition text-sm">
+            Merge profile
           </button>
         </div>
       </div>
     </div>`;
-
   const familyHtml = `<div id="family-section-content"><p class="text-sm text-gray-400 text-center py-8">Loading family members...</p></div>`;
 
   const tabContent = { edit: editFormHtml, merge: mergeHtml, family: familyHtml };
@@ -2376,25 +2380,37 @@ function editModalTab(memberId, tab) {
   _doEditMemberModal(memberId, tab);
 }
 
+function onMergeToggle(checked) {
+  const area = document.getElementById('merge-action-area');
+  area.classList.toggle('opacity-30', !checked);
+  area.classList.toggle('pointer-events-none', !checked);
+  const btn = document.getElementById('merge-submit-btn');
+  if (btn) btn.disabled = !checked;
+}
+
 let _mergeSearchTimer = null;
 async function searchMergeTarget(excludeId, query) {
   clearTimeout(_mergeSearchTimer);
   const resultsEl = document.getElementById('merge-target-results');
-  if (!query || query.length < 2) { resultsEl.innerHTML = '<p class="text-xs text-gray-400 p-3 text-center">Start typing to search</p>'; return; }
+  if (!query || query.length < 3) { resultsEl.classList.add('hidden'); return; }
+  resultsEl.classList.remove('hidden');
   _mergeSearchTimer = setTimeout(async () => {
     try {
       const members = await api('GET', `/api/members/search?q=${encodeURIComponent(query)}&limit=10`);
       const list = (members.members || members || []).filter(m => m.id !== excludeId);
       if (!list.length) { resultsEl.innerHTML = '<p class="text-xs text-gray-400 p-3 text-center">No results</p>'; return; }
-      resultsEl.innerHTML = list.map(m => {
-        const fullName = `${m.first_name} ${m.last_name}`;
-        const dob = m.date_of_birth ? formatDate(m.date_of_birth) : '';
-        return `<button type="button" onclick="selectMergeTarget('${m.id}', '${fullName.replace(/'/g, "\\'")}')"
-          class="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 border-b border-gray-50 last:border-0 text-left transition">
-          <div class="w-2 h-2 rounded-full bg-gray-300 flex-shrink-0"></div>
+      resultsEl.innerHTML = list.map(mem => {
+        const name = `${mem.first_name} ${mem.last_name}`;
+        const dob = mem.date_of_birth ? formatDate(mem.date_of_birth) : '';
+        const colour = memberColour(name);
+        const initials = ((mem.first_name||'')[0]||'') + ((mem.last_name||'')[0]||'');
+        const enc = encodeURIComponent(JSON.stringify({id:mem.id,photo_url:mem.photo_url||null,first_name:mem.first_name,last_name:mem.last_name,email:mem.email,date_of_birth:mem.date_of_birth,gender:mem.gender,phone:mem.phone,address_line1:mem.address_line1,city:mem.city,region:mem.region,postal_code:mem.postal_code}));
+        return `<button type="button" onclick="selectMergeTarget(decodeURIComponent('${enc}'))"
+          class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50 border-b border-gray-50 last:border-0 text-left transition">
+          ${mem.photo_url ? `<img src="${mem.photo_url}" class="w-9 h-9 rounded-lg object-cover flex-shrink-0">` : `<div class="w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style="background:${colour}">${initials}</div>`}
           <div class="min-w-0 flex-1">
-            <p class="text-sm font-semibold text-gray-800">${fullName}</p>
-            <p class="text-xs text-gray-400">${m.email || '—'} ${dob ? '· ' + dob : ''}</p>
+            <p class="text-xs font-bold text-gray-800">${name.toUpperCase()}</p>
+            <p class="text-xs text-gray-400 truncate">${mem.email || '—'} ${dob ? '· ' + dob : ''}</p>
           </div>
         </button>`;
       }).join('');
@@ -2402,26 +2418,88 @@ async function searchMergeTarget(excludeId, query) {
   }, 300);
 }
 
-function selectMergeTarget(targetId, targetName) {
-  document.getElementById('merge-target-id').value = targetId;
-  document.getElementById('merge-target-name').textContent = targetName;
-  document.getElementById('merge-target-selected').classList.remove('hidden');
-  // Highlight selected row
-  document.querySelectorAll('#merge-target-results button').forEach(b => {
-    b.classList.toggle('bg-blue-50', b.getAttribute('onclick').includes(targetId));
-  });
+function selectMergeTarget(jsonStr) {
+  const t = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+  document.getElementById('merge-target-id').value = t.id;
+
+  // Replace the search box area with the selected profile card
+  const area = document.getElementById('merge-target-area');
+  const colour = memberColour(`${t.first_name}${t.last_name}`);
+  const initials = ((t.first_name||'')[0]||'') + ((t.last_name||'')[0]||'');
+  const dob = t.date_of_birth ? formatDate(t.date_of_birth) : '—';
+  area.innerHTML = `
+    <div class="flex items-center gap-2 p-2.5 border border-blue-200 bg-blue-50 rounded-xl">
+      ${t.photo_url ? `<img src="${t.photo_url}" class="w-11 h-11 rounded-lg object-cover flex-shrink-0">` : `<div class="w-11 h-11 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style="background:${colour}">${initials}</div>`}
+      <div class="min-w-0 flex-1">
+        <p class="text-xs font-bold text-gray-900">${(t.first_name + ' ' + t.last_name).toUpperCase()}</p>
+        <p class="text-xs text-gray-400 truncate">${t.email || '—'}</p>
+        <p class="text-xs text-gray-400">${dob}</p>
+      </div>
+      <button type="button" onclick="resetMergeTargetSearch('${document.getElementById('merge-source-id')?.value}')" class="text-gray-300 hover:text-gray-500 flex-shrink-0">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>`;
+
+  // Show merged profile preview
+  buildMergePreview(t);
+  document.getElementById('merge-preview-section').classList.remove('hidden');
+  document.getElementById('merge-submit-btn').disabled = false;
 }
 
-async function submitMergeProfile(sourceId) {
+function resetMergeTargetSearch(sourceId) {
+  document.getElementById('merge-target-id').value = '';
+  document.getElementById('merge-preview-section').classList.add('hidden');
+  const area = document.getElementById('merge-target-area');
+  area.innerHTML = `
+    <div class="relative">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <input type="text" id="merge-target-search" class="form-input pl-9 text-sm" placeholder="Search" oninput="searchMergeTarget('${sourceId}', this.value)">
+    </div>
+    <p class="text-xs text-blue-400 mt-1 text-center">Enter at least 3 characters to search</p>
+    <div id="merge-target-results" class="mt-2 border border-gray-200 rounded-xl overflow-hidden max-h-40 overflow-y-auto hidden"></div>`;
+}
+
+function buildMergePreview(target) {
+  const el = document.getElementById('merge-preview-content');
+  const row = (icon, text) => text ? `<div class="flex items-center gap-2 text-gray-700"><span class="text-gray-400 w-4 flex-shrink-0">${icon}</span><span class="text-sm">${text}</span></div>` : '';
+  const dob = target.date_of_birth ? formatDate(target.date_of_birth) : null;
+  const addr = [target.address_line1, target.city, target.region, target.postal_code].filter(Boolean).join(', ');
+  el.innerHTML = `
+    <div class="flex items-center gap-2 mb-3">
+      <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 flex-shrink-0">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+      </div>
+      <p class="font-semibold text-gray-800">${target.first_name} ${target.last_name}</p>
+    </div>
+    ${row('📅', dob ? `${dob}` : null)}
+    ${row('⚥', target.gender || null)}
+    ${row('✉', target.email || null)}
+    ${row('📞', target.phone || null)}
+    ${row('📍', addr || null)}`;
+}
+
+function toggleMergePreview() {
+  const el = document.getElementById('merge-preview-content');
+  el.classList.toggle('hidden');
+}
+
+function swapMergeProfiles(originalSourceId) {
   const targetId = document.getElementById('merge-target-id').value;
-  const targetName = document.getElementById('merge-target-name').textContent;
   if (!targetId) { showToast('Select a target profile first', 'error'); return; }
-  if (!confirm(`This will permanently delete this profile and move everything to ${targetName}. Are you absolutely sure?`)) return;
+  // Reload the merge tab but with source swapped to target
+  showToast('Swap: re-open this member\'s profile and use Edit → Merge from there', 'info');
+}
+
+async function submitMergeProfile() {
+  const sourceId = document.getElementById('merge-source-id').value;
+  const targetId = document.getElementById('merge-target-id').value;
+  if (!targetId) { showToast('Select a target profile first', 'error'); return; }
+  if (!confirm(`This will permanently delete the source profile and move everything to the target. This cannot be undone. Continue?`)) return;
   try {
     await api('POST', `/api/members/${sourceId}/merge`, { target_id: targetId });
-    showToast('Profiles merged successfully', 'success');
+    showToast('Profiles merged', 'success');
     closeModal();
-    loadPage('members');
+    openMemberProfile(targetId);
   } catch (e) { showToast('Merge failed: ' + e.message, 'error'); }
 }
 
