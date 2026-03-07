@@ -147,15 +147,43 @@ router.get('/:id/visits', (req, res, next) => {
 router.get('/:id/transactions', (req, res, next) => {
   try {
     const db = getDb();
+    const page = parseInt(req.query.page) || 1;
+    const perPage = parseInt(req.query.perPage) || 20;
+    const offset = (page - 1) * perPage;
+
+    const total = db.prepare(`SELECT COUNT(*) as c FROM transactions WHERE member_id = ?`).get(req.params.id).c;
+
     const transactions = db.prepare(`
-      SELECT t.*, 
-        (SELECT GROUP_CONCAT(ti.description, ', ') FROM transaction_items ti WHERE ti.transaction_id = t.id) as items_summary
+      SELECT t.*,
+        (SELECT GROUP_CONCAT(ti.description || ' x' || ti.quantity, ' · ') FROM transaction_items ti WHERE ti.transaction_id = t.id) as items_summary,
+        s.first_name || ' ' || s.last_name as staff_name
       FROM transactions t
+      LEFT JOIN staff s ON t.staff_id = s.id
       WHERE t.member_id = ?
       ORDER BY t.created_at DESC
-      LIMIT 100
+      LIMIT ? OFFSET ?
+    `).all(req.params.id, perPage, offset);
+
+    // Attach full item list to each transaction
+    const getItems = db.prepare(`SELECT * FROM transaction_items WHERE transaction_id = ? ORDER BY id`);
+    const result = transactions.map(tx => ({ ...tx, items: getItems.all(tx.id) }));
+
+    res.json({ transactions: result, total, page, perPage, totalPages: Math.ceil(total / perPage) });
+  } catch (e) { next(e); }
+});
+
+// Member vouchers / gift cards
+router.get('/:id/vouchers', (req, res, next) => {
+  try {
+    const db = getDb();
+    const vouchers = db.prepare(`
+      SELECT gc.*, t.created_at as purchased_at
+      FROM gift_cards gc
+      LEFT JOIN transactions t ON gc.purchased_transaction_id = t.id
+      WHERE gc.purchased_by_member_id = ?
+      ORDER BY gc.created_at DESC
     `).all(req.params.id);
-    res.json(transactions);
+    res.json(vouchers);
   } catch (e) { next(e); }
 });
 

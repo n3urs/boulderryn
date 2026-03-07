@@ -1359,13 +1359,14 @@ async function refreshMembersList(query = '', page = 1, filter = memberActiveFil
 async function openMemberProfile(memberId) {
   window._currentProfileMemberId = memberId;
   try {
-    const [member, comments, passes, visits, transactions, events] = await Promise.all([
+    const [member, comments, passes, visits, transactionsData, events, vouchers] = await Promise.all([
       api('GET', `/api/members/${memberId}/with-pass-status`),
       api('GET', `/api/members/${memberId}/comments`),
       api('GET', `/api/passes/member/${memberId}`).catch(() => []),
       api('GET', `/api/members/${memberId}/visits`),
-      api('GET', `/api/members/${memberId}/transactions`),
+      api('GET', `/api/members/${memberId}/transactions?page=1&perPage=20`),
       api('GET', `/api/members/${memberId}/events`),
+      api('GET', `/api/members/${memberId}/vouchers`),
     ]);
 
     if (!member) { showToast('Member not found', 'error'); return; }
@@ -1468,41 +1469,43 @@ async function openMemberProfile(memberId) {
               </div>
             </div>
 
-            <!-- Collapsible: Forms -->
-            <div class="border-t border-gray-100 pt-3">
-              <button onclick="toggleProfileSection('forms-section')" class="w-full flex items-center justify-between py-1">
-                <span class="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                  Forms
-                  ${member.latest_waiver ? `<span class="px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full text-xs">${member.waiver_valid ? 'Valid' : 'Expired'}</span>` : ''}
+            <!-- Collapsible: Forms (Beta-style teal pill) -->
+            <div class="mt-2">
+              <button onclick="toggleProfileSection('forms-section')" class="w-full flex items-center justify-between px-3 py-2.5 bg-teal-500 hover:bg-teal-600 rounded-xl transition">
+                <svg id="forms-section-chevron-l" class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                <span class="text-sm font-bold text-white tracking-wide flex items-center gap-2">
+                  FORMS ${member.latest_waiver ? `<span class="w-5 h-5 rounded-full bg-white text-teal-600 text-xs font-bold flex items-center justify-center">1</span>` : ''}
                 </span>
-                <svg id="forms-section-chevron" class="w-4 h-4 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                <svg id="forms-section-chevron" class="w-4 h-4 text-white/70 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
               </button>
               <div id="forms-section" class="hidden mt-2 space-y-2">
                 ${member.latest_waiver ? `
-                  <div class="bg-gray-50 rounded-lg p-2.5">
-                    <div class="flex items-start justify-between">
+                  <div class="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <div class="flex items-start justify-between gap-2">
                       <div>
                         <p class="text-xs font-semibold text-gray-800">Waiver signed</p>
-                        <p class="text-xs text-gray-400 mt-0.5">${formatDateTime ? formatDateTime(member.latest_waiver.signed_at) : formatDate(member.latest_waiver.signed_at)}</p>
-                        ${member.latest_waiver.expires_at ? `<p class="text-xs text-gray-400">Expires ${formatDate(member.latest_waiver.expires_at)}</p>` : ''}
+                        <p class="text-xs text-gray-400 mt-0.5">${formatDate(member.latest_waiver.signed_at)}</p>
+                        ${member.latest_waiver.expires_at ? `<p class="text-xs ${new Date(member.latest_waiver.expires_at) < new Date() ? 'text-red-400' : 'text-gray-400'}">Expires ${formatDate(member.latest_waiver.expires_at)}</p>` : ''}
                       </div>
-                      ${!regPaid ? `<button onclick="validateRegistration('${member.id}')" class="text-xs px-2 py-1 bg-orange-500 text-white rounded-lg font-semibold">Collect £3</button>` : ''}
+                      ${!regPaid ? `<button onclick="validateRegistration('${member.id}')" class="text-xs px-2 py-1 bg-orange-500 text-white rounded-lg font-semibold flex-shrink-0">Collect £3</button>` : `<span class="text-xs text-green-600 font-semibold">✓ Validated</span>`}
                     </div>
-                  </div>` : `<p class="text-xs text-gray-400">No waiver on file</p>`}
+                  </div>` : `<p class="text-xs text-gray-400 text-center py-2">No waiver on file</p>`}
               </div>
             </div>
 
-            <!-- Collapsible: Tags -->
-            ${member.tags && member.tags.length > 0 ? `
-            <div class="border-t border-gray-100 pt-3">
-              <button onclick="toggleProfileSection('tags-section')" class="w-full flex items-center justify-between py-1">
-                <span class="text-xs font-bold text-gray-500 uppercase">Tags <span class="px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded-full text-xs">${member.tags.length}</span></span>
-                <svg id="tags-section-chevron" class="w-4 h-4 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            <!-- Collapsible: Tags (Beta-style teal pill) -->
+            <div class="mt-2">
+              <button onclick="toggleProfileSection('tags-section')" class="w-full flex items-center justify-between px-3 py-2.5 bg-teal-500 hover:bg-teal-600 rounded-xl transition">
+                <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                <span class="text-sm font-bold text-white tracking-wide flex items-center gap-2">
+                  TAGS ${member.tags?.length ? `<span class="w-5 h-5 rounded-full bg-white text-teal-600 text-xs font-bold flex items-center justify-center">${member.tags.length}</span>` : ''}
+                </span>
+                <svg id="tags-section-chevron" class="w-4 h-4 text-white/70 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
               </button>
-              <div id="tags-section" class="hidden mt-2 flex flex-wrap gap-1">
-                ${member.tags.map(t => `<span class="px-2 py-0.5 rounded-full text-xs font-medium text-white" style="background:${t.colour || '#3B82F6'}">${t.name}</span>`).join('')}
+              <div id="tags-section" class="hidden mt-2">
+                ${member.tags?.length ? `<div class="flex flex-wrap gap-1.5">${member.tags.map(t => `<span class="px-2.5 py-1 rounded-full text-xs font-medium text-white" style="background:${t.colour || '#3B82F6'}">${t.name}</span>`).join('')}</div>` : `<p class="text-xs text-gray-400 text-center py-2">No tags</p>`}
               </div>
-            </div>` : ''}
+            </div>
 
           </div>
         </div>
@@ -1519,7 +1522,7 @@ async function openMemberProfile(memberId) {
             <div id="profile-tab-passes" class="profile-tab-content">${renderPassesTab(passes)}</div>
             <div id="profile-tab-visits" class="profile-tab-content hidden">${renderVisitsTab(visits)}</div>
             <div id="profile-tab-events" class="profile-tab-content hidden">${renderEventsTab(events)}</div>
-            <div id="profile-tab-transactions" class="profile-tab-content hidden">${renderTransactionsTab(transactions)}</div>
+            <div id="profile-tab-transactions" class="profile-tab-content hidden">${renderTransactionsTab(transactionsData, vouchers, memberId)}</div>
           </div>
         </div>
       </div>
@@ -1806,44 +1809,117 @@ async function cancelEventEnrolment(enrolmentId, eventName) {
   }
 }
 
-function renderTransactionsTab(transactions) {
-  if (!transactions || transactions.length === 0) {
-    return `<div class="text-center py-10">
-      <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-      <p class="text-gray-400 text-sm">No transactions</p>
-    </div>`;
-  }
+function renderTransactionsTab(data, vouchers, memberId) {
+  const transactions = data?.transactions || [];
+  const totalPages = data?.totalPages || 1;
+  const currentPage = data?.page || 1;
+  const totalSpent = transactions.reduce((s, t) => s + (t.total_amount || 0), 0);
 
-  const total = transactions.reduce((s, t) => s + (t.total_amount || 0), 0);
-  const methodIcon = { 'dojo_card': '💳', 'cash': '💵', 'voucher': '🎟️', 'gift_card': '🎁', 'other': '•' };
-  const methodLabel = { 'dojo_card': 'Card', 'cash': 'Cash', 'voucher': 'Voucher', 'gift_card': 'Gift Card', 'other': 'Other' };
+  const statusBadge = (status) => {
+    if (status === 'completed') return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Succeeded</span>`;
+    if (status === 'pending' || status === 'open') return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-800 text-white">open</span>`;
+    if (status === 'failed') return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-600">Failed</span>`;
+    if (status === 'refunded') return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-600">Refunded</span>`;
+    return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">${status || '—'}</span>`;
+  };
 
-  return `
-    <div class="flex items-center justify-between mb-3 px-1">
-      <p class="text-xs text-gray-400">${transactions.length} transaction${transactions.length !== 1 ? 's' : ''}</p>
-      <p class="text-sm font-bold text-gray-700">Total spent: £${total.toFixed(2)}</p>
-    </div>
-    <div class="space-y-2">
-      ${transactions.map(t => {
-        const dt = t.created_at ? new Date(t.created_at) : null;
-        const dateStr = dt ? dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-        const timeStr = dt ? dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
-        const icon = methodIcon[t.payment_method] || '•';
-        const label = methodLabel[t.payment_method] || t.payment_method;
-        const items = t.items_summary ? t.items_summary.split(', ') : [];
-        return `<div class="p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition">
-          <div class="flex items-start justify-between gap-2">
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-1.5 flex-wrap">
-                ${items.map(item => `<span class="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">${item.trim()}</span>`).join('')}
+  const methodLabel = { 'dojo_card': 'Card', 'cash': 'Cash', 'voucher': 'Voucher', 'gift_card': 'Gift Card', 'other': 'Other', 'gocardless': 'GoCardless' };
+
+  // Vouchers section
+  const voucherHtml = `
+    <div class="mb-3 border border-gray-200 rounded-xl overflow-hidden">
+      <button onclick="toggleProfileSection('vouchers-section')" class="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>
+          <span class="text-sm font-semibold text-gray-700">Vouchers</span>
+          <span class="px-2 py-0.5 rounded-full text-xs font-bold ${vouchers?.length ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}">${vouchers?.length || 0}</span>
+        </div>
+        <svg id="vouchers-section-chevron" class="w-4 h-4 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div id="vouchers-section" class="hidden border-t border-gray-100">
+        ${!vouchers?.length ? `<p class="text-xs text-gray-400 p-4 text-center">No vouchers</p>` :
+          vouchers.map(v => `
+            <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-50 last:border-0">
+              <div>
+                <p class="text-xs font-mono font-semibold text-gray-800">${v.code}</p>
+                <p class="text-xs text-gray-400">Purchased ${formatDate(v.created_at)}</p>
               </div>
-              <p class="text-xs text-gray-400 mt-1">${dateStr} · ${timeStr} · ${icon} ${label}</p>
-            </div>
-            <p class="text-sm font-bold ${t.total_amount < 0 ? 'text-red-500' : 'text-gray-800'} flex-shrink-0">£${Math.abs(t.total_amount || 0).toFixed(2)}</p>
-          </div>
-        </div>`;
-      }).join('')}
+              <div class="text-right">
+                <p class="text-sm font-bold ${v.current_balance > 0 ? 'text-green-600' : 'text-gray-400'}">£${parseFloat(v.current_balance || 0).toFixed(2)}</p>
+                <p class="text-xs text-gray-400">of £${parseFloat(v.initial_balance || 0).toFixed(2)}</p>
+              </div>
+            </div>`).join('')}
+      </div>
     </div>`;
+
+  // History section
+  const historyHtml = `
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span class="text-sm font-semibold text-gray-700">History</span>
+        </div>
+        ${data?.total > 0 ? `<span class="text-xs text-gray-400">Total spent: <strong class="text-gray-700">£${totalSpent.toFixed(2)}</strong></span>` : ''}
+      </div>
+
+      ${transactions.length === 0 ? `<p class="text-xs text-gray-400 p-6 text-center">No transactions</p>` : `
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-xs text-gray-400 uppercase border-b border-gray-100 bg-gray-50/50">
+              <th class="px-4 py-2">Date</th>
+              <th class="px-4 py-2">Items</th>
+              <th class="px-4 py-2 text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${transactions.map(t => {
+              const dt = t.created_at ? new Date(t.created_at) : null;
+              const dateStr = dt ? dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+              const timeStr = dt ? dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+              const items = t.items || [];
+              const itemsText = items.map(i => `${i.quantity > 1 ? i.quantity + '× ' : ''}${i.description}`).join(', ');
+              const method = methodLabel[t.payment_method] || t.payment_method || '';
+              return `<tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                <td class="px-4 py-3">
+                  <p class="text-xs font-medium text-gray-800 whitespace-nowrap">${dateStr}</p>
+                  <p class="text-xs text-gray-400">${timeStr}</p>
+                </td>
+                <td class="px-4 py-3">
+                  <p class="text-xs text-gray-700">${itemsText || '—'}</p>
+                  <p class="text-xs text-gray-400">${method}</p>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <p class="text-sm font-bold ${t.total_amount < 0 ? 'text-red-500' : 'text-gray-800'} whitespace-nowrap">£${Math.abs(t.total_amount || 0).toFixed(2)}</p>
+                  <div class="flex justify-end mt-0.5">${statusBadge(t.payment_status)}</div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+
+        ${totalPages > 1 ? `
+          <div class="flex items-center justify-center gap-2 px-4 py-3 border-t border-gray-100">
+            <button onclick="loadProfileTransactions('${memberId}', ${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''} class="w-7 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed">‹</button>
+            ${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `
+              <button onclick="loadProfileTransactions('${memberId}', ${p})" class="w-7 h-7 flex items-center justify-center rounded-full text-xs font-semibold ${p === currentPage ? 'bg-[#1E3A5F] text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-100'}">${p}</button>
+            `).join('')}
+            <button onclick="loadProfileTransactions('${memberId}', ${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''} class="w-7 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed">›</button>
+          </div>` : ''}
+      `}
+    </div>`;
+
+  return voucherHtml + historyHtml;
+}
+
+async function loadProfileTransactions(memberId, page) {
+  try {
+    const [data, vouchers] = await Promise.all([
+      api('GET', `/api/members/${memberId}/transactions?page=${page}&perPage=20`),
+      api('GET', `/api/members/${memberId}/vouchers`),
+    ]);
+    document.getElementById('profile-tab-transactions').innerHTML = renderTransactionsTab(data, vouchers, memberId);
+  } catch (e) { showToast('Error loading transactions', 'error'); }
 }
 
 function toggleProfileSection(id) {
