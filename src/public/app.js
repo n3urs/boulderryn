@@ -1255,7 +1255,7 @@ async function openMemberProfile(memberId) {
               <button onclick="quickCheckInFromProfile('${member.id}', '${fullName.replace(/'/g, "\\'")}')"
                 class="w-full py-2.5 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition text-sm flex items-center justify-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                Check In
+                Check In${member.active_pass?.visits_remaining != null ? ` (${member.active_pass.visits_remaining} left)` : ''}
               </button>
             ` : ''}
             <button onclick="openPOSForMemberWithPin('${member.id}', '${fullName.replace(/'/g, "\\'")}')" class="btn btn-primary w-full btn-sm">Open in POS</button>

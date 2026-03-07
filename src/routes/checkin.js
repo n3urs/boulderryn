@@ -38,6 +38,11 @@ router.post('/process', (req, res, next) => {
     if (member.active_pass.visits_remaining !== null) {
       db.prepare("UPDATE member_passes SET visits_remaining = visits_remaining - 1, updated_at = datetime('now') WHERE id = ?")
         .run(member.active_pass.id);
+      // Expire pass when last visit is used
+      if (member.active_pass.visits_remaining <= 1) {
+        db.prepare("UPDATE member_passes SET status = 'expired', updated_at = datetime('now') WHERE id = ?")
+          .run(member.active_pass.id);
+      }
     }
 
     const checkInId = uuidv4();
@@ -101,6 +106,11 @@ router.get('/qr/:code', (req, res, next) => {
     if (member.active_pass.visits_remaining !== null) {
       db.prepare("UPDATE member_passes SET visits_remaining = visits_remaining - 1, updated_at = datetime('now') WHERE id = ?")
         .run(member.active_pass.id);
+      // Expire pass when last visit is used
+      if (member.active_pass.visits_remaining <= 1) {
+        db.prepare("UPDATE member_passes SET status = 'expired', updated_at = datetime('now') WHERE id = ?")
+          .run(member.active_pass.id);
+      }
     }
 
     const checkInId = uuidv4();
