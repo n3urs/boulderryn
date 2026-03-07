@@ -207,10 +207,11 @@ const Member = {
     `).all(id);
 
     const tags = db.prepare(`
-      SELECT t.*
+      SELECT t.*, mt.note as member_note, mt.expires_at as tag_expires_at, mt.applied_at, mt.applied_by
       FROM member_tags mt
       JOIN tags t ON mt.tag_id = t.id
       WHERE mt.member_id = ?
+      ORDER BY mt.applied_at DESC
     `).all(id);
 
     const todayCheckIn = db.prepare(`

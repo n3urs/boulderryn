@@ -187,6 +187,35 @@ router.get('/:id/vouchers', (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Tags — add/remove
+router.get('/tags/types', (req, res, next) => {
+  try {
+    const db = getDb();
+    res.json(db.prepare('SELECT * FROM tags ORDER BY tag_type').all());
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/tags', (req, res, next) => {
+  try {
+    const db = getDb();
+    const { tag_id, note, expires_at, applied_by } = req.body;
+    if (!tag_id) return res.status(400).json({ error: 'tag_id required' });
+    db.prepare(`INSERT INTO member_tags (member_id, tag_id, note, expires_at, applied_at, applied_by)
+      VALUES (?, ?, ?, ?, datetime('now'), ?)
+      ON CONFLICT(member_id, tag_id) DO UPDATE SET note=excluded.note, expires_at=excluded.expires_at, applied_at=excluded.applied_at, applied_by=excluded.applied_by`)
+      .run(req.params.id, tag_id, note || null, expires_at || null, applied_by || null);
+    res.json({ success: true });
+  } catch (e) { next(e); }
+});
+
+router.delete('/:id/tags/:tagId', (req, res, next) => {
+  try {
+    const db = getDb();
+    db.prepare('DELETE FROM member_tags WHERE member_id = ? AND tag_id = ?').run(req.params.id, req.params.tagId);
+    res.json({ success: true });
+  } catch (e) { next(e); }
+});
+
 // Event history
 router.get('/:id/events', (req, res, next) => {
   try {

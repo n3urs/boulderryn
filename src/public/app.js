@@ -1395,10 +1395,23 @@ async function openMemberProfile(memberId) {
             <button onclick="closeModal()" class="absolute top-2 right-2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
-            <label class="absolute bottom-2 right-2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition cursor-pointer" title="Upload photo">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-              <input type="file" accept="image/*" class="hidden" onchange="uploadMemberPhoto('${member.id}', this)">
-            </label>
+            <div class="absolute bottom-2 right-2 relative" id="photo-btn-container">
+              <button onclick="togglePhotoMenu('${member.id}')" class="w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition" title="Change photo">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              </button>
+              <div id="photo-menu-${member.id}" class="hidden absolute bottom-9 right-0 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 w-44">
+                <label class="flex items-center gap-2.5 px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm text-gray-700">
+                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                  Take photo
+                  <input type="file" accept="image/*" capture="environment" class="hidden" onchange="uploadMemberPhoto('${member.id}', this)">
+                </label>
+                <label class="flex items-center gap-2.5 px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm text-gray-700 border-t border-gray-100">
+                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  Upload photo
+                  <input type="file" accept="image/*" class="hidden" onchange="uploadMemberPhoto('${member.id}', this)">
+                </label>
+              </div>
+            </div>
             ${isUnder18 ? `<span class="absolute top-2 left-2 px-2 py-0.5 bg-blue-500 text-white text-xs font-bold rounded-full">Under 18</span>` : ''}
             ${member.has_warning ? `<span class="absolute top-2 left-2 px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center gap-1"><svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>Warning</span>` : ''}
           </div>
@@ -1502,8 +1515,27 @@ async function openMemberProfile(memberId) {
                 </span>
                 <svg id="tags-section-chevron" class="w-4 h-4 text-white/70 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
               </button>
-              <div id="tags-section" class="hidden mt-2">
-                ${member.tags?.length ? `<div class="flex flex-wrap gap-1.5">${member.tags.map(t => `<span class="px-2.5 py-1 rounded-full text-xs font-medium text-white" style="background:${t.colour || '#3B82F6'}">${t.name}</span>`).join('')}</div>` : `<p class="text-xs text-gray-400 text-center py-2">No tags</p>`}
+              <div id="tags-section" class="hidden mt-2 space-y-1.5">
+                ${member.tags?.length ? member.tags.map(t => {
+                  const tagIcon = { warning: '⚠', jr_assessed: '◎', note: '📋', student: '🎓' }[t.tag_type] || '•';
+                  const expiredSoon = t.tag_expires_at && new Date(t.tag_expires_at) < new Date(Date.now() + 30*24*60*60*1000);
+                  const expired = t.tag_expires_at && new Date(t.tag_expires_at) < new Date();
+                  return `<div class="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-100">
+                    <span class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold" style="background:${t.colour || '#6B7280'}">${tagIcon}</span>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-xs font-semibold text-gray-800">${t.name}</p>
+                      ${t.member_note ? `<p class="text-xs text-gray-400 truncate">${t.member_note}</p>` : ''}
+                      ${t.tag_expires_at ? `<p class="text-xs ${expired ? 'text-red-400' : expiredSoon ? 'text-orange-400' : 'text-gray-400'}">Expires ${formatDate(t.tag_expires_at)}</p>` : ''}
+                    </div>
+                    <button onclick="removeMemberTag('${member.id}', '${t.id}')" class="text-gray-300 hover:text-red-400 transition flex-shrink-0">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                  </div>`;
+                }).join('') : ''}
+                <button onclick="showAddTagModal('${member.id}')" class="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-gray-300 text-xs text-gray-500 hover:border-teal-400 hover:text-teal-600 transition">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                  Add tag
+                </button>
               </div>
             </div>
 
@@ -1934,6 +1966,17 @@ function toggleCommentForm() {
   document.getElementById('comment-form-container').classList.toggle('hidden');
 }
 
+function togglePhotoMenu(memberId) {
+  const menu = document.getElementById('photo-menu-' + memberId);
+  if (!menu) return;
+  menu.classList.toggle('hidden');
+  // Close on outside click
+  setTimeout(() => {
+    const close = (e) => { if (!menu.contains(e.target)) { menu.classList.add('hidden'); document.removeEventListener('click', close); } };
+    document.addEventListener('click', close);
+  }, 10);
+}
+
 async function uploadMemberPhoto(memberId, input) {
   if (!input.files[0]) return;
   const form = new FormData();
@@ -1945,6 +1988,122 @@ async function uploadMemberPhoto(memberId, input) {
     if (data.success) { showToast('Photo updated', 'success'); openMemberProfile(memberId); }
     else showToast('Upload failed: ' + data.error, 'error');
   } catch (e) { showToast('Upload failed: ' + e.message, 'error'); }
+}
+
+async function showAddTagModal(memberId) {
+  // Load tag types
+  let tagTypes;
+  try { tagTypes = await api('GET', '/api/members/tags/types'); }
+  catch (e) {
+    // fallback static list
+    tagTypes = [
+      { id: 'tag-warning', name: 'Warning', colour: '#F97316', tag_type: 'warning' },
+      { id: 'tag-jr-assessed', name: 'Jr. Assessed', colour: '#10B981', tag_type: 'jr_assessed' },
+      { id: 'tag-note', name: 'Note', colour: '#6B7280', tag_type: 'note' },
+      { id: 'tag-student', name: 'Student', colour: '#6366F1', tag_type: 'student' },
+    ];
+  }
+
+  const tagIcons = { warning: `<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`, jr_assessed: `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke-width="2"/></svg>`, note: `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`, student: `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>` };
+
+  const html = `
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4" id="add-tag-overlay">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div class="flex items-center gap-2 mb-4">
+          <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+          <h3 class="text-base font-bold text-gray-900">Add A Tag & Proficiency</h3>
+          <button onclick="document.getElementById('add-tag-overlay').remove()" class="ml-auto text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Type</p>
+        <div class="flex flex-wrap gap-2 mb-4" id="tag-type-pills">
+          ${tagTypes.map((t, i) => `
+            <button type="button" onclick="selectTagType('${t.id}', '${t.colour}')"
+              data-tag-id="${t.id}"
+              class="tag-type-pill flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border-2 transition ${i === 0 ? 'border-transparent text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}"
+              style="${i === 0 ? `background:${t.colour};` : ''}">
+              ${tagIcons[t.tag_type] || ''}
+              ${t.name}
+            </button>`).join('')}
+        </div>
+        <input type="hidden" id="selected-tag-id" value="${tagTypes[0]?.id || ''}">
+        <input type="hidden" id="selected-tag-colour" value="${tagTypes[0]?.colour || ''}">
+
+        <textarea id="tag-note-input" class="form-input text-sm w-full mb-4" rows="3" placeholder="Note"></textarea>
+
+        <div class="flex items-center gap-3 mb-3">
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="tag-expiry-toggle" class="sr-only peer" onchange="toggleTagExpiry()">
+            <div class="w-10 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-teal-300 rounded-full peer peer-checked:bg-teal-500 transition"></div>
+            <div class="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform"></div>
+          </label>
+          <span class="text-sm text-gray-600">expiration date</span>
+        </div>
+
+        <div id="tag-expiry-section" class="hidden mb-4">
+          <div class="flex gap-2 flex-wrap mb-2">
+            <button type="button" onclick="setTagExpiry(1)" class="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-300 hover:bg-gray-50">1 Year Exp.</button>
+            <button type="button" onclick="setTagExpiry(2)" class="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-300 hover:bg-gray-50">2 Years Exp.</button>
+            <button type="button" onclick="setTagExpiry(5)" class="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-300 hover:bg-gray-50">5 Years Exp.</button>
+          </div>
+          <input type="date" id="tag-expiry-date" class="form-input text-sm w-full">
+        </div>
+
+        <button onclick="submitAddTag('${memberId}')" class="w-full py-2.5 bg-[#1E3A5F] hover:bg-[#2A4D7A] text-white font-semibold rounded-xl transition">Submit</button>
+      </div>
+    </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', html);
+  // Select first tag by default
+  if (tagTypes[0]) selectTagType(tagTypes[0].id, tagTypes[0].colour);
+}
+
+function selectTagType(tagId, colour) {
+  document.getElementById('selected-tag-id').value = tagId;
+  document.getElementById('selected-tag-colour').value = colour;
+  document.querySelectorAll('.tag-type-pill').forEach(p => {
+    const isSelected = p.dataset.tagId === tagId;
+    p.style.background = isSelected ? colour : '';
+    p.style.borderColor = isSelected ? colour : '';
+    p.className = p.className.replace(/border-transparent text-white|border-gray-200 bg-white text-gray-600 hover:border-gray-300/g, '');
+    p.className += isSelected ? ' border-transparent text-white' : ' border-gray-200 bg-white text-gray-600 hover:border-gray-300';
+  });
+}
+
+function toggleTagExpiry() {
+  const on = document.getElementById('tag-expiry-toggle').checked;
+  document.getElementById('tag-expiry-section').classList.toggle('hidden', !on);
+}
+
+function setTagExpiry(years) {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + years);
+  document.getElementById('tag-expiry-date').value = d.toISOString().slice(0, 10);
+}
+
+async function submitAddTag(memberId) {
+  const tagId = document.getElementById('selected-tag-id').value;
+  const note = document.getElementById('tag-note-input').value.trim();
+  const expiryOn = document.getElementById('tag-expiry-toggle').checked;
+  const expiresAt = expiryOn ? document.getElementById('tag-expiry-date').value : null;
+  if (!tagId) return;
+  try {
+    await api('POST', `/api/members/${memberId}/tags`, { tag_id: tagId, note: note || null, expires_at: expiresAt });
+    document.getElementById('add-tag-overlay')?.remove();
+    showToast('Tag added', 'success');
+    openMemberProfile(memberId);
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+async function removeMemberTag(memberId, tagId) {
+  if (!confirm('Remove this tag?')) return;
+  try {
+    await api('DELETE', `/api/members/${memberId}/tags/${tagId}`);
+    showToast('Tag removed', 'success');
+    openMemberProfile(memberId);
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
 }
 
 async function toggleMemberWarning(memberId, enable) {
