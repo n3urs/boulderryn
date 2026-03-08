@@ -4615,22 +4615,85 @@ async function showStaffModal(staffId = null) {
         </div>
         <div class="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">4-Digit PIN ${isEdit ? '' : '*'}</label>
-            <input type="text" name="pin" maxlength="4" pattern="[0-9]{4}" ${isEdit ? '' : 'required'} class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center text-lg tracking-[0.3em] font-mono" placeholder="${isEdit ? 'Leave blank to keep' : '0000'}">
+            <label class="block text-sm font-medium text-gray-700 mb-1">4-Digit PIN ${isEdit ? '(blank = keep)' : '*'}</label>
+            <input type="text" name="pin" maxlength="4" pattern="[0-9]{4}" ${isEdit ? '' : 'required'} class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center text-lg tracking-[0.3em] font-mono" placeholder="${isEdit ? '••••' : '0000'}">
+            <p class="text-xs text-gray-400 mt-0.5">Default: birthday DDMM</p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input type="password" name="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="${isEdit ? 'Leave blank to keep' : 'Optional'}">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <input type="date" name="start_date" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" value="${staff?.start_date || ''}">
           </div>
         </div>
+
+        <!-- Permission overrides -->
+        <div class="mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-sm font-medium text-gray-700">Permission Overrides</label>
+            <button type="button" onclick="resetPermissionsToRole()" class="text-xs text-blue-600 hover:underline">Reset to role defaults</button>
+          </div>
+          <div class="border border-gray-200 rounded-xl p-3 grid grid-cols-2 gap-2" id="permission-toggles">
+            ${await buildPermissionToggles(staff)}
+          </div>
+        </div>
+
         <div id="staff-form-error" class="text-red-500 text-sm mb-3 hidden"></div>
-        <div class="flex justify-end gap-2">
-          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition text-sm font-medium">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium">${isEdit ? 'Save Changes' : 'Add Staff'}</button>
+        <div class="flex ${isEdit ? 'justify-between' : 'justify-end'} gap-2">
+          ${isEdit ? `<button type="button" onclick="deleteStaff('${staffId}', '${staff.first_name} ${staff.last_name}')" class="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg transition text-sm font-medium border border-red-200">Delete</button>` : ''}
+          <div class="flex gap-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition text-sm font-medium">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-[#1E3A5F] hover:bg-[#2A4D7A] text-white rounded-lg transition text-sm font-medium">${isEdit ? 'Save Changes' : 'Add Staff'}</button>
+          </div>
         </div>
       </form>
     </div>
   `);
+}
+
+async function buildPermissionToggles(staff) {
+  const PERMS = [
+    { key: 'checkin', label: 'Check In' },
+    { key: 'pos', label: 'POS' },
+    { key: 'members_view', label: 'View Members' },
+    { key: 'members_edit', label: 'Edit Members' },
+    { key: 'events_view', label: 'Events View' },
+    { key: 'events_edit', label: 'Events Edit' },
+    { key: 'routes_view', label: 'Routes View' },
+    { key: 'routes_edit', label: 'Routes Edit' },
+    { key: 'analytics', label: 'Analytics' },
+    { key: 'settings', label: 'Settings' },
+    { key: 'staff', label: 'Staff Mgmt' },
+    { key: 'waiver_validate', label: 'Validate Waivers' },
+  ];
+  const perms = staff?.permissions || {};
+  return PERMS.map(p => {
+    const checked = p.key in perms ? perms[p.key] : true;
+    return `<label class="flex items-center gap-2 cursor-pointer">
+      <input type="checkbox" name="perm_${p.key}" ${checked ? 'checked' : ''} class="perm-toggle w-4 h-4 text-[#1E3A5F]">
+      <span class="text-xs text-gray-700">${p.label}</span>
+    </label>`;
+  }).join('');
+}
+
+async function resetPermissionsToRole() {
+  const role = document.querySelector('#staff-form [name=role]')?.value;
+  if (!role) return;
+  try {
+    const defaults = await api('GET', `/api/staff/default-permissions/${role}`);
+    document.querySelectorAll('.perm-toggle').forEach(cb => {
+      const key = cb.name.replace('perm_', '');
+      if (key in defaults) cb.checked = defaults[key];
+    });
+  } catch(e) { showToast('Could not load defaults', 'error'); }
+}
+
+async function deleteStaff(staffId, name) {
+  if (!confirm(`Permanently delete ${name}? This cannot be undone.`)) return;
+  try {
+    await api('DELETE', `/api/staff/${staffId}`);
+    showToast(`${name} deleted`, 'success');
+    closeModal();
+    loadStaffManagement();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
 async function saveStaff(e, staffId) {
@@ -4639,11 +4702,21 @@ async function saveStaff(e, staffId) {
   const data = Object.fromEntries(new FormData(form));
   const errEl = document.getElementById('staff-form-error');
 
+  // Collect permission overrides from checkboxes
+  const permissions = {};
+  document.querySelectorAll('.perm-toggle').forEach(cb => {
+    permissions[cb.name.replace('perm_', '')] = cb.checked;
+  });
+  data.permissions = permissions;
+
   // Clean empty optional fields
   if (!data.pin) delete data.pin;
   if (!data.password) delete data.password;
   if (!data.email) delete data.email;
   if (!data.phone) delete data.phone;
+  if (!data.start_date) delete data.start_date;
+  // Remove perm_ keys from flat data (already collected above)
+  Object.keys(data).filter(k => k.startsWith('perm_')).forEach(k => delete data[k]);
 
   try {
     if (staffId) {
@@ -5106,50 +5179,96 @@ async function loadGeneralSettings() {
       <div class="max-w-2xl">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">General Settings</h3>
         <form id="general-settings-form" onsubmit="saveGeneralSettings(event)" class="space-y-4">
+          <!-- Gym Details -->
           <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <h4 class="font-medium text-gray-900 mb-3">Gym Details</h4>
+            <h4 class="font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+              Gym Details
+            </h4>
             <div class="space-y-3">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Gym Name</label>
-                <input type="text" name="gym_name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" value="${settings.gym_name || ''}">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Gym Name</label>
+                  <input type="text" name="gym_name" class="form-input" value="${settings.gym_name || ''}">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Contact Email</label>
+                  <input type="email" name="contact_email" class="form-input" value="${settings.contact_email || ''}" placeholder="info@boulderryn.co.uk">
+                </div>
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Peak Description</label>
-                  <input type="text" name="peak_description" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" value="${settings.peak_description || ''}">
+                  <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Phone</label>
+                  <input type="tel" name="gym_phone" class="form-input" value="${settings.gym_phone || ''}">
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Off-Peak Description</label>
-                  <input type="text" name="off_peak_description" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" value="${settings.off_peak_description || ''}">
+                  <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Website</label>
+                  <input type="text" name="gym_website" class="form-input" value="${settings.gym_website || ''}" placeholder="https://boulderryn.co.uk">
                 </div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Address</label>
+                <input type="text" name="gym_address" class="form-input" value="${settings.gym_address || ''}" placeholder="Rope Walk, Penryn, Cornwall, TR10 8RY">
               </div>
             </div>
           </div>
 
+          <!-- Opening Hours -->
           <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <h4 class="font-medium text-gray-900 mb-3">Pricing</h4>
-            <div class="grid grid-cols-3 gap-3">
+            <h4 class="font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              Opening Hours
+            </h4>
+            <div class="space-y-2">
+              ${['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(day => `
+                <div class="flex items-center gap-3">
+                  <span class="text-sm text-gray-600 w-24 flex-shrink-0">${day}</span>
+                  <input type="text" name="hours_${day.toLowerCase()}" class="form-input flex-1 text-sm" value="${settings['hours_' + day.toLowerCase()] || ''}" placeholder="e.g. 9:00–21:00 or Closed">
+                </div>`).join('')}
+            </div>
+          </div>
+
+          <!-- Pricing -->
+          <div class="bg-white border border-gray-200 rounded-xl p-5">
+            <h4 class="font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              Pricing
+            </h4>
+            <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Registration Fee (£)</label>
-                <input type="number" step="0.01" name="first_time_registration_fee" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" value="${settings.first_time_registration_fee || ''}">
+                <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Registration Fee (£)</label>
+                <input type="number" step="0.01" name="first_time_registration_fee" class="form-input" value="${settings.first_time_registration_fee || '3.00'}">
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Shoe Rental (£)</label>
-                <input type="number" step="0.01" name="shoe_rental_price" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" value="${settings.shoe_rental_price || ''}">
+                <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Shoe Rental (£)</label>
+                <input type="number" step="0.01" name="shoe_rental_price" class="form-input" value="${settings.shoe_rental_price || '3.50'}">
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                <select name="currency" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                  <option value="GBP" ${settings.currency === 'GBP' ? 'selected' : ''}>GBP (£)</option>
-                  <option value="EUR" ${settings.currency === 'EUR' ? 'selected' : ''}>EUR (€)</option>
-                  <option value="USD" ${settings.currency === 'USD' ? 'selected' : ''}>USD ($)</option>
-                </select>
+                <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Peak Label</label>
+                <input type="text" name="peak_description" class="form-input" value="${settings.peak_description || ''}">
               </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Off-Peak Label</label>
+                <input type="text" name="off_peak_description" class="form-input" value="${settings.off_peak_description || ''}">
+              </div>
+            </div>
+          </div>
+
+          <!-- Induction Video -->
+          <div class="bg-white border border-gray-200 rounded-xl p-5">
+            <h4 class="font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              Induction Video
+            </h4>
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">YouTube URL</label>
+              <input type="url" name="waiver_video_url" class="form-input" value="${settings.waiver_video_url || ''}" placeholder="https://www.youtube.com/watch?v=...">
+              <p class="text-xs text-gray-400 mt-1">Shown on the public registration page. Must be watched in full before the waiver form.</p>
             </div>
           </div>
 
           <div class="flex justify-end">
-            <button type="submit" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition text-sm">Save Changes</button>
+            <button type="submit" class="px-6 py-2.5 bg-[#1E3A5F] hover:bg-[#2A4D7A] text-white font-medium rounded-lg transition text-sm">Save Changes</button>
           </div>
         </form>
       </div>

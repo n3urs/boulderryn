@@ -40,6 +40,20 @@ router.post('/:id/activate', (req, res, next) => {
   try { Staff.activate(req.params.id); res.json({ success: true }); } catch (e) { next(e); }
 });
 
+router.delete('/:id', (req, res, next) => {
+  try {
+    const db = require('../main/database/db').getDb();
+    // Safety: never delete the last owner
+    const owners = db.prepare("SELECT COUNT(*) as c FROM staff WHERE role='owner' AND is_active=1").get();
+    const target = db.prepare('SELECT * FROM staff WHERE id=?').get(req.params.id);
+    if (target?.role === 'owner' && owners.c <= 1) {
+      return res.status(400).json({ error: 'Cannot delete the only owner account' });
+    }
+    db.prepare('DELETE FROM staff WHERE id=?').run(req.params.id);
+    res.json({ success: true });
+  } catch (e) { next(e); }
+});
+
 router.post('/auth/pin', (req, res, next) => {
   try { res.json(Staff.authenticateByPin(req.body.pin) || { error: 'Invalid PIN' }); } catch (e) { next(e); }
 });
