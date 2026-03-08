@@ -1453,6 +1453,8 @@ async function openMemberProfile(memberId) {
               <button onclick="assignPassModal('${member.id}', '${fullName.replace(/'/g, "\\'")}')" class="btn btn-secondary w-full btn-sm">Assign Pass</button>
               ${passes.some(p => p.status === 'active') ? `
                 <button onclick="showMemberQrCode('${member.id}', '${fullName.replace(/'/g, "\\'")}')" class="btn btn-secondary w-full btn-sm">View QR Code</button>` : ''}
+              ${member.email ? `
+                <button onclick="emailMemberQrCode('${member.id}')" class="btn btn-secondary w-full btn-sm">Email QR Code</button>` : ''}
             </div>
 
             <!-- Collapsible: Comments -->

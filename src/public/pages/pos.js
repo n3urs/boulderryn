@@ -755,7 +755,12 @@ function posShowReceipt(txn, items, member, paymentMethod, extras = {}) {
       <p class="text-slate-400 text-xs mt-1">Paid via ${methodLabel}</p>
       <p class="text-slate-500 text-xs">Ref: ${txn.id.split('-')[0]}</p>
     </div>
-    <button onclick="posNewTx(); posRenderCart();" class="w-full mt-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition">
+    ${member && member.email ? `
+    <button onclick="posSendReceipt('${txn.id}', '${member.id}')" id="pos-send-receipt-btn" class="w-full mt-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      Send Receipt
+    </button>` : ''}
+    <button onclick="posNewTx(); posRenderCart();" class="w-full mt-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition">
       New Transaction
     </button>
   `;
@@ -775,6 +780,24 @@ async function posSendQrEmail(memberId) {
     }
   } catch (err) {
     showToast('Email failed: ' + err.message, 'error');
+  }
+}
+
+async function posSendReceipt(transactionId, memberId) {
+  const btn = document.getElementById('pos-send-receipt-btn');
+  if (btn) { btn.textContent = 'Sending...'; btn.disabled = true; }
+  try {
+    const result = await api('POST', '/api/email/send-receipt', { member_id: memberId, transaction_id: transactionId });
+    if (result.success) {
+      showToast('Receipt emailed successfully', 'success');
+      if (btn) { btn.textContent = 'Receipt Sent ✓'; btn.style.opacity = '0.6'; }
+    } else {
+      showToast('Email failed: ' + (result.error || 'Unknown error'), 'error');
+      if (btn) { btn.textContent = 'Send Receipt'; btn.disabled = false; }
+    }
+  } catch (err) {
+    showToast('Email failed: ' + err.message, 'error');
+    if (btn) { btn.textContent = 'Send Receipt'; btn.disabled = false; }
   }
 }
 
