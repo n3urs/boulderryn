@@ -1,246 +1,183 @@
-# BoulderRyn — Development Log
+# Dynamic — Development Reference
 
-> Updated as we go. Read this at the start of every session to pick up where we left off.
-
----
-
-## Project Overview
-
-Full climbing gym management platform. Cloning/improving on BETA software at `gym.sendmoregetbeta.com` (v26.23).
-
-- **Repo:** https://github.com/n3urs/boulderryn (public)
-- **Stack:** Express.js + Node.js + SQLite (better-sqlite3) + Tailwind CSS CDN
-- **DB:** `data/boulderryn.db`
-- **Server:** `PORT=8080 node server.js` — kill old with `pkill -f "node server.js"`
-- **Tunnel:** `/usr/local/bin/cloudflared tunnel --url http://localhost:8080` (temp URL)
-- **Auth:** No persistent login. PIN-based per-action auth. Staff PIN: Oscar's is `2109`.
-- **Colour scheme:** Blue/navy (`#1E3A5F` primary)
+> Read this at the start of every session. See PRODUCT.md for business/vision context.
+> Last updated: 2026-03-08
 
 ---
 
-## Architecture
+## What This Is
+
+**Dynamic** — a multi-tenant SaaS climbing gym management platform.
+UK-first, bouldering-focused. Being built to sell to multiple gyms via subscription.
+
+This codebase was originally built for BoulderRyn gym (Penryn, Cornwall). It's now being generalised into a multi-gym product. The rebrand from "BoulderRyn" → "Dynamic" is in progress (see TODO below).
+
+---
+
+## Running Locally
+
+```bash
+npm install
+PORT=8080 node server.js
+# Open http://localhost:8080
+```
+
+Kill old instance: `pkill -f "node server.js"`
+Tunnel (for external testing): `/usr/local/bin/cloudflared tunnel --url http://localhost:8080`
+DB: `data/boulderryn.db` (will be renamed as part of multi-tenancy)
+
+---
+
+## Tech Stack
+
+- **Backend:** Express.js + Node.js
+- **Database:** SQLite via better-sqlite3
+- **Frontend:** Vanilla JS SPA (`src/public/app.js` ~5500 lines), `loadPage(name)` router
+- **Styling:** Tailwind CSS (CDN), blue/navy scheme (`#1E3A5F` primary)
+- **Auth:** Staff PIN (salted PBKDF2 sha512), JWT for member sessions
+- **Email:** Nodemailer (SMTP via settings)
+- **Payments:** Dojo (in-person), GoCardless (DD) — skeletons only
+
+---
+
+## Project Structure
 
 ```
+server.js                    — Express entry point
 src/
-  routes/          — Express API routes (members, passes, checkin, pos, settings, etc.)
+  routes/                    — API route handlers (one file per domain)
   main/
-    models/        — DB model classes (member, pass, staff, product, route, etc.)
+    database/
+      db.js                  — DB connection
+      init.js                — Schema init + migrations
+    models/                  — Data access layer
+    services/
+      email.js               — Email service (QR, receipts, waiver, welcome)
+  integrations/
+    dojo.js                  — Dojo card reader integration
   public/
-    index.html     — Staff management app shell
-    app.js         — All frontend JS (~5500+ lines, SPA router)
-    app.html       — Member-facing portal (login, booking, wall map)
-    register.html  — Public registration page (waiver + induction video)
+    index.html               — Staff app shell
+    app.js                   — All frontend JS (SPA)
+    app.html                 — Member portal
+    register.html            — Public registration/waiver page
+    pages/
+      pos.js                 — POS frontend
+      waiver.js              — Waiver frontend
+reference/                   — Gym layout, waiver text, pricing reference docs
+data/
+  boulderryn.db              — SQLite database (single gym, dev)
+  photos/                    — Member photo uploads
 ```
-
-Frontend is a vanilla JS SPA. `loadPage(name)` switches views. All API calls via `api(method, path, body)` helper.
 
 ---
 
-## Pages / Features Built
+## Features Built
 
-### Dashboard (Visitors page — default landing)
-- Stats: in gym now, revenue today, members count, this week revenue
-- Quick search (min 3 chars)
-- "Needs Validation" list — members with no waiver or unpaid reg fee, "Collect £3" button
-- Active Visitors list — shows checked-in members today, QR scan check-in
-- `+` FAB — quick add / walk-in
+### Staff App Pages
+| Page | Status | Notes |
+|---|---|---|
+| Dashboard (Visitors) | ✅ Complete | Stats cards, needs validation list, active visitors, check-in |
+| Members | ✅ Complete | List, search, filters, profile modal |
+| Profile Modal | ✅ Complete | 4 tabs: Overview, Passes, Transactions, Events |
+| Edit Member | ✅ Complete | Edit, Merge Profile, Family Members tabs |
+| Point of Sale | ✅ Complete | Cart, member chip, pass assignment, Dojo/GoCardless skeleton |
+| Check-in | ✅ Complete | QR scan, name search, pass validation, day pass expiry |
+| Events | ✅ Complete | List + calendar view, create/cancel/enrolments |
+| Routes | ✅ Complete | Cards view, SVG map, wall filters, add climb, grade chart |
+| Analytics | ✅ Complete | KPI cards, bar charts, EOD report, popular products, grade dist |
+| Settings > Staff | ✅ Complete | Add/edit/delete/reset PIN/deactivate staff |
+| Settings > Products | ✅ Complete | Categories + products, add/edit/archive |
+| Settings > Pass Types | ✅ Complete | Grouped by category, add/edit/disable |
+| Settings > General | ✅ Complete | Gym details, opening hours, pricing, induction video URL |
+| Settings > Integrations | ✅ Complete | GoCardless, Dojo, Email/SMTP config |
 
-### Members Page
-- Member list with search, filters (active pass, tag, etc.)
-- Member card → opens **Profile Modal**
+### Backend API
+All routes under `/api/*`. See `src/routes/` for full list.
+Key endpoints: members, passes, checkin, pos/transactions, products, staff, analytics, events, routes, settings, email, waivers, giftcards.
 
-### Profile Modal (4 tabs: Overview | Passes | Transactions | Events)
-**Overview tab:**
-- Full-width photo (or initials block), camera icon to upload in-place
-- `POST /api/members/:id/photo` via multer → `data/photos/`
-- Icon rows: DOB+age, gender, email, phone, address, emergency contact
-- Under-18 badge (blue), Warning flag (orange button → red badge when set)
-  - `POST /api/members/:id/warning` — sets `has_warning` + `warning_note`
-- Collapsible sections: Comments, Forms, Tags
-- Forms: shows waiver date/expiry, "Collect £3" or "✓ Validated"
-- Tags: coloured pills
-- Buttons: "Assign Pass", "Open in POS", "Edit Profile"
+### Member Portal (`app.html`)
+- Login with auth code (emailed)
+- Profile, pass status, booking
 
-**Passes tab:**
-- Beta-style pass cards (square badge, date range, gear menu, "Paused" tag)
-- Gear menu: Pause / Resume / Cancel
-- Check In button (10-visit passes show remaining count)
-
-**Transactions tab:**
-- Vouchers section (collapsible, gift card code + balance)
-- History table: date+time | items | amount + status badge
-- Pagination: client-side, `GET /api/members/:id/transactions?page=&perPage=`
-- Status badges: Succeeded (green), open (dark), Failed (red), Refunded (orange)
-
-**Events tab:**
-- Sub-filter pills: All / Upcoming / Attended / Missed / Cancelled
-
-### Edit Modal (tabbed: Edit | Merge Profile | Family Members)
-- Edit: Beta-layout with middle name, DOB dropdowns, address block, duplicate detection
-- Merge Profile: search (min 3 chars), Swap button, profile preview
-- Family Members: link/unlink family
-
-### POS (Point of Sale)
-- Full cart with line items
-- Each day entry item has a **member chip** (blue pill) — tap to reassign to any member
-- Multi-person day pass: open from Dad's profile → add items → swap chips for kids → pay → all checked in
-- Dojo card reader integration (placeholder/skeleton)
-- GoCardless recurring DD (placeholder)
-
-### Check-in Flow
-- QR code check-in (desk scan)
-- Single-entry passes expire at end of same day (23:59:59)
-- 10-visit passes: decrements `visits_remaining`, expires at 0
-- Both desk and QR routes updated
-- `visits_remaining` shown on Check In button: "Check In (3 left)"
-
-### Assign Pass (on member profile)
-- "Assign Pass" button between "Open in POS" and "Edit Profile"
-- Requires manager PIN (`members_edit` permission)
-- Modal: pick pass type (grouped by category), peak/off-peak toggle, optional custom price
-- Useful for comps, staff passes, free entries
-
-### Settings Page (5 tabs)
-
-#### Staff tab
-- Table: Name, Role, Email, Status, Actions (Edit / Reset PIN / Deactivate)
-- Role badge (pink pill for Owner)
-- `+ Add Staff` button
-
-#### Products tab
-- 92 products across 9 categories
-- Grouped by category with `+ Add here` and `Edit` (category)
-- Per-product: price, active dot, edit/archive icons
-- `+ Category` and `+ Product` buttons
-
-#### Pass Types tab
-- Grouped by category (labels from `PASS_CATEGORIES` map)
-- Categories: `single_entry`, `multi_visit`, `monthly_pass`, `membership_dd`, `annual_membership`, `staff`
-- Per-pass: peak/off-peak price, duration, visits, active dot, edit/disable icons
-- `+ New Pass Type` button
-
-#### General tab
-- Gym Details: name, contact email, phone, website, address
-- Opening Hours: Mon–Sun free text fields
-- Pricing: reg fee, shoe rental, peak/off-peak labels
-- Induction Video: YouTube URL
-- Save Changes button (PUTs each key individually to `/api/settings/:key`)
-
-#### Integrations tab
-- GoCardless: access token + sandbox/live toggle
-- Dojo: API key + terminal ID
-- Email/SMTP: host, port, from address, username, password
+### Registration (`register.html`)
+- Induction video + waiver form (adult + minor)
+- Signature canvas
+- QR code emailed on completion
 
 ---
 
 ## Database
 
-### Key tables
+Single SQLite DB with 29 tables. Key ones:
+
 | Table | Purpose |
 |---|---|
-| `members` | All members — includes `has_warning`, `warning_note`, `photo_url` (added via ALTER) |
-| `staff` | Staff — `pin_hash` (salted PBKDF2), `role`, `permissions_json`, `is_active` |
-| `pass_types` | Pass type definitions |
-| `member_passes` | Issued passes — `visits_remaining`, `status` |
-| `check_ins` | Check-in log |
-| `transactions` / `transaction_items` | POS transactions |
-| `products` / `product_categories` | POS products |
-| `settings` | Key/value store for gym config |
-| `gift_cards` / `gift_card_transactions` | Vouchers |
-| `events`, `event_enrolments`, etc. | Events system (partial) |
-| `walls`, `climbs`, `climb_logs` | Routes system (partial) |
+| members | All member data |
+| staff | Staff accounts (PIN hashed PBKDF2) |
+| pass_types | Pass type definitions |
+| member_passes | Issued passes (visits_remaining, status) |
+| check_ins | Check-in log |
+| transactions / transaction_items | POS sales |
+| products / product_categories | POS products (92 products, 9 categories seeded) |
+| settings | Key/value gym config |
+| events / event_enrolments | Events system |
+| walls / climbs / climb_logs | Routes system |
+| gift_cards / gift_card_transactions | Vouchers |
 
-### Test data
-- 3 test members: Oscar Sullivan, Arlo Barnes (12), Bex Bourne
-- 92 products, 9 categories
-- Pass types seeded
+Test data: 7 members, 2 with active passes, 3 seeded climbs, 2 seeded events.
 
 ---
 
-## API Routes
+## ⚠️ REBRAND TODO (for Claude Code)
 
-```
-GET/PUT  /api/settings / /api/settings/:key
-GET      /api/members
-GET/PUT  /api/members/:id
-POST     /api/members/:id/photo
-POST     /api/members/:id/warning
-GET      /api/members/:id/transactions
-GET      /api/members/:id/vouchers
-GET/POST /api/passes/types
-GET/PUT  /api/passes/types/:id
-POST     /api/passes/issue
-POST     /api/checkin
-POST     /api/staff/auth/pin
-GET/POST /api/staff
-PUT/DEL  /api/staff/:id
-GET/POST /api/products
-GET/PUT/DEL /api/products/:id
-GET/POST /api/products/categories
-PUT/DEL  /api/products/categories/:id
-POST     /api/pos/transaction
-```
+The codebase still contains many references to "BoulderRyn" that need updating as part of the Dynamic platform rebrand. These should be replaced with config-driven values from `settings` table (gym name, gym brand) rather than hardcoded.
 
----
+Files containing "BoulderRyn" / "boulderryn" references:
+- `src/main/database/init.js` — DB init references
+- `src/main/database/db.js` — DB filename, JWT secret string
+- `src/main/models/member.js` — email templates ("BoulderRyn" in email body)
+- `src/main/models/transaction.js` — email templates
+- `src/main/models/pass.js` — references
+- `src/main/models/waiver.js` — references
+- `src/main/models/staff.js` — JWT secret fallback string
+- `src/main/models/seed-products.js` — product seed data
+- `src/main/services/email.js` — email from address, subject lines, HTML templates
+- `src/routes/members.js` — references
+- `src/routes/climber.js` — JWT secret, email templates
+- `src/routes/dojo.js` — references
+- `src/public/pages/pos.js` — UI text
+- `src/public/pages/waiver.js` — waiver text, gym name in copy
+- `src/public/app.js` — gym name, logo alt text, "BoulderRyn" in UI
+- `src/integrations/dojo.js` — references
+- `server.js` — env file reference (`/etc/boulderryn.env`)
 
-## Security
-
-- PINs: salted PBKDF2 (sha512, 10000 iterations)
-- JWT secret: env-based (`JWT_SECRET` in `.env`)
-- Legacy plain SHA256 PINs auto-upgraded on first use
-- GDPR: data export + deletion endpoints
+**Approach:** Gym name, logo, contact email, colours etc. should all come from the `settings` table (already has entries for `gym_name`, `gym_email`, etc.). Replace hardcoded strings with `getSetting('gym_name')` calls. The sidebar heading "BoulderRyn" in `index.html` and `app.js` should read from settings.
 
 ---
 
-## Known Issues / TODO
+## 🏗️ Multi-Tenancy TODO (next major milestone)
 
-- [ ] Staff login/roles — full role-based access control not wired to all endpoints yet
-- [ ] GoCardless integration — skeleton only, needs real DD flow
-- [ ] Dojo integration — skeleton only, needs real payment initiation
+Current state: single-tenant (one gym, one DB). To sell to multiple gyms:
 
-## Completed Features (2026-03-08 session)
-
-- [x] Staff Management — `saveStaff`, `resetStaffPin`, `toggleStaffStatus`, `deleteStaff` all wired, tested
-- [x] Analytics page — KPI cards, Revenue/Check-in bar charts, EOD report, Popular Products, Grade Distribution
-- [x] Events page — List view, Calendar view, Create event modal, event detail, enrol/cancel
-- [x] Routes page — Cards view, Map view, Add Climb modal, Grade Distribution chart, Reset Gym
-- [x] Email QR Code — "Email QR Code" button added to member profile Overview tab action buttons
-- [x] Send Receipt — "Send Receipt" button added to POS success screen (shows for members with email)
-- [x] POS `posSendReceipt()` function added to pos.js (calls POST /api/email/send-receipt)
+1. **Per-gym DB isolation** — move to `data/gyms/{gym_id}/gym.db` structure
+2. **Gym provisioning script** — `scripts/provision-gym.js` — creates DB, seeds defaults, creates owner account
+3. **Subdomain routing** — `gymname.dynamicgym.co.uk` → loads correct gym DB
+4. **Super-admin panel** — Oscar can view all gyms, status, usage, billing
+5. **Stripe billing** — subscription management, webhook for active/inactive
+6. **Gym signup flow** — new gym registers, pays, gets provisioned automatically
 
 ---
 
-## Git Log (recent)
+## Security (pre-launch checklist)
 
-```
-f997262 Settings: Staff Management + General tabs fully built
-68da617 GDPR compliance + Dojo payment integration skeleton
-7f4a8f0 Security: salted PIN hashing, env-based JWT secret
-5e00276 Fix: memberColour -> nameToColour (crash fix)
-e3bdba1 Fix bugs found in testing
-1062e64 Merge Profile: match Beta exactly
-986c1cc Pass cards: Beta-style layout
-b5c12ef Edit form: match Beta layout
-4e072bf Multi-person day pass: assign each cart item to different members
-68be367 Fix day passes to expire at midnight + Assign Pass button
-98ed7ab 10-visit passes expire when all visits used
-2b45061 Profile modal overhaul: photo, warning flag, icon info rows
-a62b65a Transactions tab: Beta-style layout, pagination, status badges
-```
+- [ ] Set `JWT_SECRET` in environment (currently falls back to insecure hardcoded string)
+- [ ] Add `helmet` middleware to server.js
+- [ ] Rate limit PIN/auth endpoints
+- [ ] `chmod 600 data/*.db`
+- [ ] Run behind HTTPS (nginx + Let's Encrypt)
 
 ---
 
-## Session Notes
+## Repo
 
-### 2026-03-08
-- Tested all 5 Settings tabs visually — all looking good
-- Fixed `PASS_CATEGORIES` map missing `membership_dd` key (was showing raw DB key in UI)
-- Created this DEVELOPMENT.md
-
-### 2026-03-08 (subagent pass)
-- Verified all 6 task areas: Staff, Email, Analytics, Events, Routes — all working
-- Added "Email QR Code" button directly on member profile Overview tab (not just in QR modal)
-- Added "Send Receipt" button in POS success screen for members with email
-- Added `posSendReceipt(transactionId, memberId)` async function in pos.js
-- Full test pass via browser: Dashboard, Events, Routes, Analytics, Settings/Staff all confirmed working
-- No JS console errors on any page
+GitHub: https://github.com/n3urs/dynamic (renamed from boulderryn)
