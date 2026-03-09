@@ -224,6 +224,63 @@ DEFAULT_GYM_ID=mygym PORT=8080 node server.js
 
 ---
 
+## Member Portal — Spec (NOT YET BUILT — next major feature)
+
+A member-facing web app / PWA. Members access it at `gymname.cruxgym.co.uk/me`.
+
+### Auth
+- Members register via the waiver form (captures their email + creates their account)
+- Login: enter email → confirmation code sent → logged in (no password, OTP/magic link style)
+- Session persisted in localStorage so they stay logged in on their device
+- Members save the link or access it from welcome email
+- Future: native app (iOS/Android) — for now PWA only
+
+### What members see
+
+**1. QR Code**
+- Their unique entry QR code shown prominently on the home screen
+- Tap to go fullscreen (for easy scanning at the desk)
+- Shows pass type + expiry date below
+
+**2. Gym Map + Routes**
+- The gym's floor plan map (same data as staff gym map builder)
+- Zoomable and pannable
+- Each route is a marker/pin on the map
+- Tap a route → see grade, colour, setter name, date set
+- "Mark as sent" button — saves to their personal logbook (stored per member in DB)
+- Routes section = member logbook (their sends history)
+
+**3. Noticeboard**
+- List of announcements from the gym, newest first
+- Only managers/owners can post (from within the staff app)
+- Each post has title, body, optional image, date
+- Members see new posts highlighted / badge on noticeboard tab
+
+### PWA
+- Installable to phone home screen (no App Store)
+- `manifest.json` already exists in `/src/public/` — extend it
+- Add a service worker for basic offline support (cache the map + last-seen noticeboard)
+- Theme colour: gym's brand colour (or Crux navy `#1E3A5F` as fallback)
+
+### Backend routes needed
+- `POST /me/auth/request` — send OTP to email
+- `POST /me/auth/verify` — verify OTP, return session token
+- `GET /me/profile` — member profile, pass status, QR code data
+- `GET /me/map` — gym map + routes (same as staff map, read-only)
+- `POST /me/routes/:id/send` — mark route as sent
+- `DELETE /me/routes/:id/send` — unmark
+- `GET /me/logbook` — member's sends history
+- `GET /me/noticeboard` — list of posts
+- `POST /api/noticeboard` — create post (managers only, requires auth + role check)
+- `DELETE /api/noticeboard/:id` — delete post (managers only)
+
+### DB changes needed
+- `member_sends` table: `member_id`, `route_id`, `sent_at`
+- `noticeboard` table: `id`, `gym_id`, `title`, `body`, `image_url`, `created_by`, `created_at`
+- `member_sessions` table (or use JWT): for OTP auth tokens
+
+---
+
 ## Marketing Website
 
 Separate from the app. Lives at `/home/ec2-user/.openclaw/workspace/crux-website/` and is served by nginx from `/var/www/cruxgym/`.
