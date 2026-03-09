@@ -224,6 +224,59 @@ DEFAULT_GYM_ID=mygym PORT=8080 node server.js
 
 ---
 
+## Integration — Connecting All The Parts (NEEDS WORK)
+
+The different parts of the platform exist but aren't coherently linked together. A user shouldn't need to know URLs — everything should flow naturally.
+
+### Current gaps
+
+**1. Marketing site → App**
+- `cruxgym.co.uk` has no working "Sign Up" or "Log In" buttons yet
+- Fix: update the marketing site nav/CTAs to link to `cruxgym.co.uk/signup` and `cruxgym.co.uk/login`
+
+**2. Login → right place**
+- After a gym owner logs in at `cruxgym.co.uk/login`, they need to be routed to `gymname.cruxgym.co.uk`
+- If a staff member logs in, same — route to their gym's subdomain
+- The login page needs to know which gym the user belongs to (look up by email)
+
+**3. Member registration link not surfaced in staff app**
+- Staff need to be able to share `gymname.cruxgym.co.uk/register` with new members (print it, show on a tablet, send via email)
+- Fix: add a "Member Registration Link" widget in the staff dashboard — shows the URL + QR code to print/display
+
+**4. Member portal link not surfaced**
+- Once built, members need to know `gymname.cruxgym.co.uk/me` exists
+- Fix: include the link in the member welcome email (sent after waiver registration) and on the registration confirmation page
+
+**5. Super-admin access**
+- Oscar (platform owner) needs a clear, bookmarkable URL to get to the super-admin panel
+- Currently at `[server-ip]:8080/admin` or via Cloudflare tunnel — not obvious
+- Fix: once production DNS is stable, decide if it lives at `admin.cruxgym.co.uk` or `cruxgym.co.uk/admin`
+- Document the URL and token somewhere Oscar can find it (credentials.md)
+
+**6. Billing / account management from within the gym app**
+- Gym owners need to be able to get back to their Stripe billing portal from inside the app
+- Fix: Settings → Billing tab already exists — ensure it has a working "Manage Subscription" button linking to Stripe portal
+
+**7. Email links**
+- Welcome email (sent on provisioning) should link directly to the gym's subdomain
+- Member registration confirmation email should include link to member portal (`/me`) once built
+- Staff invite email should link directly to the invite acceptance page
+
+### All the URLs, mapped out
+
+| What | URL | Status |
+|------|-----|--------|
+| Marketing site | `cruxgym.co.uk` | Live |
+| Signup | `cruxgym.co.uk/signup` | Built, needs CTA from marketing site |
+| Login | `cruxgym.co.uk/login` | Built, needs CTA from marketing site |
+| Gym staff app | `gymname.cruxgym.co.uk` | Live |
+| Member registration | `gymname.cruxgym.co.uk/register` | Built, needs surfacing in staff app |
+| Member portal | `gymname.cruxgym.co.uk/me` | NOT YET BUILT |
+| Super-admin | `cruxgym.co.uk/admin` (TBC) | Built, URL not settled |
+| Staff invite | `gymname.cruxgym.co.uk/invite/:token` | Built |
+
+---
+
 ## Member Portal — Spec (NOT YET BUILT — next major feature)
 
 A member-facing web app / PWA. Members access it at `gymname.cruxgym.co.uk/me`.
