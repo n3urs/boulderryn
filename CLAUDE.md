@@ -193,24 +193,156 @@ Sidebar only shows permitted nav items based on role.
 
 ## What Still Needs Doing
 
-### 1. Reset test on existing gyms
-Existing gyms provisioned before the setup wizard won't have `setup_complete` set. To trigger the wizard on an existing gym:
+### Dev/testing utilities
+
+**Reset setup wizard on existing gym:**
 ```bash
 sqlite3 data/gyms/{gym_id}/gym.db "UPDATE settings SET value='0' WHERE key='setup_complete';"
 ```
 
-### 2. Resetting for local dev/testing
+**Full reset for local dev:**
 ```bash
 sqlite3 data/gyms/mygym/gym.db "DELETE FROM staff; UPDATE settings SET value='0' WHERE key='setup_complete';"
 DEFAULT_GYM_ID=mygym PORT=8080 node server.js
 ```
 
-### 3. Potential future features
-- Member-facing app (`app.html`) — logbook, booking, profile
-- GoCardless direct debit integration (member-facing recurring payments)
-- Push notifications / email reminders for expiring passes
-- Multi-location support (one gym, multiple sites)
-- Bulk member import (CSV upload)
+---
+
+## Full Roadmap — Everything Left To Build
+
+Roughly in priority order. Claude Code should work through these in sequence.
+
+---
+
+### PRIORITY 1 — Member Portal
+Fully specced above in the "Member Portal" section. This is the biggest missing piece.
+
+---
+
+### PRIORITY 2 — Integration & Navigation
+
+Already documented in the "Integration" section above. Key items:
+- Marketing site Sign Up / Log In buttons linked to `/signup` and `/login`
+- Login routes user to correct gym subdomain by email lookup
+- Member registration link + QR code widget inside staff app (shareable / printable)
+- Member portal link in welcome email and registration confirmation email
+- Settle and document super-admin URL
+
+---
+
+### PRIORITY 3 — Super-Admin Panel Improvements
+
+Oscar (platform owner) needs a proper control panel, not just a gym list.
+
+**Impersonate / Open Gym:**
+- Each gym in the admin list should have an "Open Gym" button
+- Clicking it generates a one-time login token for that gym, redirects Oscar to `gymname.cruxgym.co.uk` already logged in as Owner
+- Backend: `POST /admin/impersonate/:gymId` → returns a short-lived token → redirect to `gymname.cruxgym.co.uk/?adminToken=xxx`
+- Gym app checks for `?adminToken=` on load, exchanges for a full session
+
+**Revenue dashboard on admin panel:**
+- Total active gyms, trialing gyms, churned gyms
+- MRR (monthly recurring revenue) — calculated from active subscriptions
+- Trial gyms ending in the next 7 days (conversion risk)
+- Recent signups list
+
+**Quick links on admin panel:**
+- Link to Stripe dashboard
+- Link to cruxgym.co.uk marketing site
+- Link to server logs / status
+- Link to each gym's subdomain
+
+---
+
+### PRIORITY 4 — Email Improvements
+
+**Branded email templates:**
+- All emails (welcome, QR code, invite, receipt) should use a consistent HTML template
+- Crux logo at top, clean layout, navy/white colour scheme
+- Footer: "Powered by Crux · cruxgym.co.uk · Unsubscribe"
+
+**Onboarding email sequence (automated, time-based):**
+- Day 0: Welcome email (already exists)
+- Day 3: "Getting started" tips — how to add members, set up pass types
+- Day 7: "You're one week in" — checklist of setup steps with links
+- Day 13: "Your trial ends tomorrow" — reminder to add card details + Stripe portal link
+- Day 14 (if no card): "Trial expired" — subscription wall + link to reactivate
+
+**Member emails:**
+- Registration confirmation: "Welcome to {Gym Name}" — includes member portal link (`/me`), QR code image, pass details
+- Pass expiry reminder: 7 days before + 1 day before
+- Receipt email: after POS transaction (if email provided)
+
+---
+
+### PRIORITY 5 — Production Hardening
+
+**Security:**
+- Set `JWT_SECRET` to a real random string in `/etc/crux.env` (currently using insecure fallback)
+- Set `ADMIN_TOKEN` to a real secret (not `admin_secret_placeholder`)
+- Rate limiting on auth endpoints (`/me/auth/request`, `/signup`, `/login`) — prevent OTP abuse
+- HTTPS for `*.cruxgym.co.uk` subdomains — Cloudflare handles this (already proxied), but confirm SSL mode is Full not Flexible
+- Input validation on all public-facing routes (signup, register, member portal)
+
+**Rename the repo and folder:**
+- `boulderryn-project/` → should be renamed to `crux/` or `cruxgym/`
+- GitHub repo `n3urs/dynamic` → already shows as `n3urs/Crux` on GitHub but the git remote URL still says `dynamic.git`
+
+**Production env file:**
+- All secrets should be in `/etc/crux.env`, loaded by the systemd service
+- Document which vars are required vs optional
+
+---
+
+### PRIORITY 6 — Monitoring & Backups
+
+**Uptime monitoring:**
+- Set up a free uptime monitor (e.g. UptimeRobot or Better Uptime) on `cruxgym.co.uk` and the EC2 server
+- Alert Oscar if the server goes down
+
+**Database backups:**
+- Cron job to back up `data/platform.db` and all `data/gyms/*/gym.db` files
+- Back up to S3 (eu-west-1) daily, keep 30 days
+- Script: `scripts/backup.sh`
+
+**Error logging:**
+- Currently errors just go to stdout/systemd journal
+- Consider adding a simple error log file or Sentry (free tier) for catching crashes
+
+---
+
+### PRIORITY 7 — UX Polish
+
+**Error pages:**
+- Custom 404 page (nginx) — branded, links back to cruxgym.co.uk
+- Billing expired page — already exists (billing gate UI), but review UX
+- "Gym not found" page — if subdomain doesn't match any gym
+
+**Mobile responsiveness:**
+- Staff app (app.html) — audit on mobile, particularly POS and member profiles
+- The desk check-in flow should work well on a tablet (portrait orientation)
+
+**Print support:**
+- Member QR code: "Print QR" button on member profile → printable A6 card
+- Day pass receipt: printable format
+- Staff rota / end-of-day report: print-friendly layout
+
+**Loading states:**
+- All API calls should have loading spinners / skeleton screens
+- Avoid blank white flashes between page loads
+
+---
+
+### FUTURE (no timeline)
+
+- GoCardless direct debit for member recurring payments
+- Native iOS/Android app (post-PWA)
+- Multi-location support (one gym account, multiple sites)
+- Bulk member CSV import
+- Booking system (lane/session reservations)
+- Push notifications for expiring passes and noticeboard posts
+- White-label option (gym uses their own domain, no Crux branding)
+- Reseller/franchise support (one account manages multiple gym brands)
 
 ---
 
