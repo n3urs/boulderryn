@@ -53,7 +53,7 @@ router.post('/auth/request', (req, res) => {
   if (!email) return res.status(400).json({ error: 'Email required' });
 
   const db = getDb();
-  const member = db.prepare('SELECT id, first_name, last_name, email FROM members WHERE LOWER(email) = LOWER(?) AND is_active = 1').get(email.trim());
+  const member = db.prepare('SELECT id, first_name, last_name, email FROM members WHERE LOWER(email) = LOWER(?)').get(email.trim());
 
   // Always respond OK — don't reveal if email exists
   if (!member) return res.json({ ok: true });
@@ -97,7 +97,7 @@ router.post('/auth/verify', (req, res) => {
   if (!email || !token) return res.status(400).json({ error: 'Email and code required' });
 
   const db = getDb();
-  const member = db.prepare('SELECT id, first_name, last_name, email FROM members WHERE LOWER(email) = LOWER(?) AND is_active = 1').get(email.trim());
+  const member = db.prepare('SELECT id, first_name, last_name, email FROM members WHERE LOWER(email) = LOWER(?)').get(email.trim());
   if (!member) return res.status(401).json({ error: 'Invalid code' });
 
   const otp = db.prepare(`
