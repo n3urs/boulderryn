@@ -176,4 +176,44 @@ router.post('/gyms/:gymId/activate', (req, res) => {
   }
 });
 
+// ── GET /admin/stats ───────────────────────────────────────────────────────
+
+router.get('/stats', (req, res) => {
+  try {
+    const dataRoot = getDataRoot();
+    const gymsDir = path.join(dataRoot, 'gyms');
+    if (!fs.existsSync(gymsDir)) return res.json({ totalGyms: 0, totalMembers: 0, totalRevenue: 0, activeGyms: 0, trialingGyms: 0, suspendedGyms: 0 });
+
+    const gymIds = fs.readdirSync(gymsDir).filter(f => {
+      const dbPath = path.join(gymsDir, f, 'gym.db');
+      return fs.statSync(path.join(gymsDir, f)).isDirectory() && fs.existsSync(dbPath);
+    });
+
+    const platformDb = getPlatformDb();
+    let totalMembers = 0, totalRevenue = 0, activeGyms = 0, trialingGyms = 0, suspendedGyms = 0;
+
+    for (const gymId of gymIds) {
+      try {
+        const Database = require('better-sqlite3');
+        const gymDb = new Database(path.join(gymsDir, gymId, 'gym.db'), { readonly: true });
+        const mc = gymDb.prepare('SELECT COUNT(*) as c FROM members').get();
+        const rev = gymDb.prepare("SELECT SUM(total_amount) as r FROM transactions WHERE status = 'completed'").get();
+        totalMembers += mc?.c || 0;
+        totalRevenue += rev?.r || 0;
+        gymDb.close();
+
+        const billing = platformDb.prepare('SELECT status, trial_ends_at FROM gym_billing WHERE gym_id = ?').get(gymId);
+        const status = billing?.status || 'trialing';
+        if (status === 'active') activeGyms++;
+        else if (status === 'suspended') suspendedGyms++;
+        else trialingGyms++;
+      } catch {}
+    }
+
+    res.json({ totalGyms: gymIds.length, totalMembers, totalRevenue, activeGyms, trialingGyms, suspendedGyms });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

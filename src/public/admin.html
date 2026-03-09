@@ -3,97 +3,204 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Crux Admin</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>CRUX // COMMAND</title>
   <style>
-    [x-cloak] { display: none !important; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+    :root {
+      --blue: #00c2ff;
+      --blue-dim: rgba(0,194,255,0.12);
+      --blue-glow: rgba(0,194,255,0.4);
+      --gold: #f59e0b;
+      --gold-dim: rgba(245,158,11,0.12);
+      --red: #ef4444;
+      --green: #10b981;
+      --bg: #020917;
+      --bg2: #040f1f;
+      --bg3: #071428;
+      --border: rgba(0,194,255,0.18);
+      --text: #94a3b8;
+      --text-bright: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: linear-gradient(rgba(0,194,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,194,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    @keyframes pulse-glow { 0%,100% { box-shadow: 0 0 8px var(--blue-glow); } 50% { box-shadow: 0 0 24px var(--blue-glow), 0 0 40px rgba(0,194,255,0.2); } }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+
+    /* LOGIN */
+    #login-screen { position: relative; z-index: 10; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+    .login-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 3rem; width: 100%; max-width: 420px; box-shadow: 0 0 60px rgba(0,194,255,0.08), inset 0 0 60px rgba(0,0,0,0.5); animation: fadeIn 0.5s ease; }
+    .login-logo { text-align: center; margin-bottom: 2rem; }
+    .hex { width: 64px; height: 64px; background: var(--blue-dim); border: 1px solid var(--blue); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; animation: pulse-glow 3s ease-in-out infinite; }
+    .login-title { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 700; color: var(--blue); letter-spacing: 4px; text-shadow: 0 0 20px var(--blue-glow); }
+    .login-sub { font-size: 0.7rem; color: var(--text); letter-spacing: 2px; text-transform: uppercase; margin-top: 0.25rem; }
+    .field-label { display: block; font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--blue); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .hud-input { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem 1rem; color: var(--text-bright); font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; margin-bottom: 1.25rem; }
+    .hud-input:focus { border-color: var(--blue); box-shadow: 0 0 12px var(--blue-glow); }
+    .btn-primary { width: 100%; background: var(--blue-dim); border: 1px solid var(--blue); color: var(--blue); font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; padding: 0.85rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; overflow: hidden; position: relative; }
+    .btn-primary:hover { background: rgba(0,194,255,0.22); box-shadow: 0 0 20px var(--blue-glow); }
+    .error-msg { color: var(--red); font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; margin-top: 0.75rem; display: none; }
+
+    /* HEADER */
+    .hud-header { background: rgba(4,15,31,0.96); border-bottom: 1px solid var(--border); backdrop-filter: blur(10px); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    .header-logo { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 700; color: var(--blue); letter-spacing: 4px; text-shadow: 0 0 12px var(--blue-glow); }
+    .header-logo span { color: var(--gold); }
+    .header-left { display: flex; align-items: center; gap: 1.5rem; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: blink 2s ease-in-out infinite; display: inline-block; margin-right: 6px; }
+    .header-status { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 1px; }
+    .btn-logout { background: transparent; border: 1px solid rgba(239,68,68,0.3); color: rgba(239,68,68,0.7); font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; padding: 0.4rem 0.9rem; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+    .btn-logout:hover { border-color: var(--red); color: var(--red); box-shadow: 0 0 10px rgba(239,68,68,0.3); }
+
+    /* MAIN */
+    .main { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+    .section-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+    .section-title { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 3px; text-transform: uppercase; color: var(--blue); white-space: nowrap; }
+    .section-line { flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
+
+    /* STATS */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem; animation: fadeIn 0.4s ease 0.1s both; }
+    .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem 1.5rem; position: relative; overflow: hidden; }
+    .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--blue), transparent); }
+    .stat-label { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 2px; text-transform: uppercase; color: var(--text); margin-bottom: 0.5rem; }
+    .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700; color: var(--blue); text-shadow: 0 0 12px var(--blue-glow); line-height: 1; }
+    .stat-value.gold { color: var(--gold); text-shadow: 0 0 12px rgba(245,158,11,0.4); }
+    .stat-value.green { color: var(--green); text-shadow: 0 0 12px rgba(16,185,129,0.4); }
+    .stat-value.red { color: var(--red); text-shadow: 0 0 12px rgba(239,68,68,0.4); }
+
+    /* PROVISION */
+    .provision-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; animation: fadeIn 0.4s ease 0.2s both; }
+    .provision-grid { display: grid; grid-template-columns: 1fr 1.5fr 1.5fr auto; gap: 0.75rem; align-items: end; }
+    @media (max-width: 800px) { .provision-grid { grid-template-columns: 1fr 1fr; } }
+    .hud-input-sm { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.875rem; color: var(--text-bright); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+    .hud-input-sm:focus { border-color: var(--blue); box-shadow: 0 0 10px var(--blue-glow); }
+    .hud-input-sm::placeholder { color: rgba(148,163,184,0.35); }
+    .btn-deploy { background: var(--gold-dim); border: 1px solid var(--gold); color: var(--gold); font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 0.6rem 1.25rem; border-radius: 6px; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+    .btn-deploy:hover { background: rgba(245,158,11,0.22); box-shadow: 0 0 16px rgba(245,158,11,0.4); }
+    .provision-msg { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; margin-top: 0.75rem; display: none; }
+
+    /* GYM CARDS */
+    .gyms-list { display: flex; flex-direction: column; gap: 0.75rem; animation: fadeIn 0.4s ease 0.3s both; }
+    .gym-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem 1.5rem; display: grid; grid-template-columns: 130px 1fr auto; gap: 1.5rem; align-items: center; transition: border-color 0.2s, box-shadow 0.2s; }
+    @media (max-width: 900px) { .gym-card { grid-template-columns: 1fr; } }
+    .gym-card:hover { border-color: rgba(0,194,255,0.35); box-shadow: 0 0 20px rgba(0,194,255,0.05); }
+    .gym-id { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--blue); font-weight: 700; }
+    .gym-name { font-size: 1rem; font-weight: 600; color: var(--text-bright); margin-bottom: 0.4rem; }
+    .gym-meta { display: flex; align-items: center; gap: 0.875rem; flex-wrap: wrap; }
+    .gym-meta-item { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text); }
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .badge-active { background: rgba(16,185,129,0.12); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+    .badge-trialing { background: rgba(0,194,255,0.1); color: var(--blue); border: 1px solid rgba(0,194,255,0.3); }
+    .badge-suspended { background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+    .badge-past_due { background: rgba(245,158,11,0.1); color: var(--gold); border: 1px solid rgba(245,158,11,0.3); }
+    .gym-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; }
+    .btn-link { background: var(--bg3); border: 1px solid var(--border); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 1px; text-transform: uppercase; padding: 0.35rem 0.7rem; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s; }
+    .btn-link:hover { border-color: var(--blue); color: var(--blue); box-shadow: 0 0 8px var(--blue-glow); }
+    .btn-link.gold:hover { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 8px rgba(245,158,11,0.3); }
+    .btn-link.green:hover { border-color: var(--green); color: var(--green); box-shadow: 0 0 8px rgba(16,185,129,0.3); }
+    .btn-danger { background: transparent; border: 1px solid rgba(239,68,68,0.3); color: rgba(239,68,68,0.6); font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 1px; text-transform: uppercase; padding: 0.35rem 0.7rem; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+    .btn-danger:hover { border-color: var(--red); color: var(--red); box-shadow: 0 0 8px rgba(239,68,68,0.3); }
+    .btn-succeed { background: transparent; border: 1px solid rgba(16,185,129,0.3); color: rgba(16,185,129,0.6); font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 1px; text-transform: uppercase; padding: 0.35rem 0.7rem; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+    .btn-succeed:hover { border-color: var(--green); color: var(--green); box-shadow: 0 0 8px rgba(16,185,129,0.3); }
+    .divider { width: 1px; height: 18px; background: var(--border); }
+    .empty { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text); padding: 2rem; text-align: center; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; }
   </style>
 </head>
-<body class="bg-gray-50">
+<body>
 
-<!-- Login Screen -->
-<div id="login-screen" class="min-h-screen flex items-center justify-center px-4">
-  <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
-    <h1 class="text-2xl font-bold text-gray-900 mb-2 text-center">Crux Admin</h1>
-    <p class="text-gray-500 text-center mb-6">Platform Management</p>
-    
-    <form id="login-form" onsubmit="login(event)">
-      <label class="block text-sm font-medium text-gray-700 mb-2">Admin Token</label>
-      <input type="password" id="token-input" required
-        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
-        placeholder="Enter admin token">
-      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition">
-        Log In
-      </button>
-      <p id="login-error" class="text-red-500 text-sm mt-2 hidden"></p>
-    </form>
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="hex">
+        <svg width="30" height="30" fill="none" stroke="#00c2ff" stroke-width="1.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+        </svg>
+      </div>
+      <div class="login-title">CRUX</div>
+      <div class="login-sub">Command Center &nbsp;//&nbsp; Restricted Access</div>
+    </div>
+    <label class="field-label">Authorization Token</label>
+    <input type="password" id="token-input" class="hud-input" placeholder="Enter admin token">
+    <button class="btn-primary" onclick="login()">AUTHENTICATE</button>
+    <p id="login-error" class="error-msg"></p>
   </div>
 </div>
 
-<!-- Admin Dashboard -->
-<div id="admin-screen" class="hidden min-h-screen">
-  <!-- Header -->
-  <nav class="bg-white border-b border-gray-200">
-    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-      <h1 class="text-xl font-bold text-gray-900">Crux Admin</h1>
-      <button onclick="logout()" class="text-sm text-gray-600 hover:text-gray-900 transition">Log Out</button>
+<!-- DASHBOARD -->
+<div id="admin-screen" style="display:none">
+  <div class="hud-header">
+    <div class="header-left">
+      <div class="header-logo">CRUX <span>//</span> COMMAND</div>
+      <div class="header-status"><span class="status-dot"></span>SYSTEM ONLINE</div>
     </div>
-  </nav>
+    <button class="btn-logout" onclick="logout()">DISCONNECT</button>
+  </div>
 
-  <div class="max-w-7xl mx-auto px-6 py-8">
-    
-    <!-- Provision Form -->
-    <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
-      <h2 class="text-lg font-semibold text-gray-900 mb-4">Provision New Gym</h2>
-      <form id="provision-form" onsubmit="provisionGym(event)" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <input type="text" id="provision-gym-id" required pattern="[a-z0-9-]+" 
-          placeholder="Gym ID (e.g. climbhigh)" 
-          class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-        <input type="text" id="provision-gym-name" required 
-          placeholder="Gym Name (e.g. Climb High)" 
-          class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-        <input type="email" id="provision-owner-email" required 
-          placeholder="Owner Email" 
-          class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition">
-          Provision Gym
-        </button>
-      </form>
-      <p id="provision-message" class="text-sm mt-3 hidden"></p>
+  <div class="main">
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Total Gyms</div><div class="stat-value" id="stat-gyms">—</div></div>
+      <div class="stat-card"><div class="stat-label">Total Members</div><div class="stat-value" id="stat-members">—</div></div>
+      <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value green" id="stat-active">—</div></div>
+      <div class="stat-card"><div class="stat-label">Trialing</div><div class="stat-value" id="stat-trialing">—</div></div>
+      <div class="stat-card"><div class="stat-label">Suspended</div><div class="stat-value red" id="stat-suspended">—</div></div>
+      <div class="stat-card"><div class="stat-label">Revenue</div><div class="stat-value gold" id="stat-revenue">—</div></div>
     </div>
 
-    <!-- Gyms Table -->
-    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-gray-900">All Gyms</h2>
-        <button onclick="loadGyms()" class="text-sm text-gray-600 hover:text-gray-900 transition">
-          <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-          </svg>
-          Refresh
-        </button>
+    <!-- Deploy -->
+    <div class="section-header">
+      <div class="section-title">Deploy New Gym</div>
+      <div class="section-line"></div>
+    </div>
+    <div class="provision-panel">
+      <div class="provision-grid">
+        <div>
+          <label class="field-label">Gym ID</label>
+          <input type="text" id="provision-gym-id" class="hud-input-sm" placeholder="climbhigh">
+        </div>
+        <div>
+          <label class="field-label">Gym Name</label>
+          <input type="text" id="provision-gym-name" class="hud-input-sm" placeholder="Climb High">
+        </div>
+        <div>
+          <label class="field-label">Owner Email</label>
+          <input type="email" id="provision-owner-email" class="hud-input-sm" placeholder="owner@example.com">
+        </div>
+        <button class="btn-deploy" onclick="provisionGym()">DEPLOY ▶</button>
       </div>
-      
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead>
-            <tr class="text-left text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
-              <th class="px-6 py-3 font-medium">Gym ID</th>
-              <th class="px-6 py-3 font-medium">Name</th>
-              <th class="px-6 py-3 font-medium">Plan</th>
-              <th class="px-6 py-3 font-medium">Status</th>
-              <th class="px-6 py-3 font-medium">Members</th>
-              <th class="px-6 py-3 font-medium">Last Activity</th>
-              <th class="px-6 py-3 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="gyms-tbody" class="divide-y divide-gray-100">
-            <tr>
-              <td colspan="7" class="px-6 py-8 text-center text-gray-400">Loading...</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <div id="provision-msg" class="provision-msg"></div>
+    </div>
+
+    <!-- Gym Registry -->
+    <div class="section-header">
+      <div class="section-title">Gym Registry</div>
+      <div class="section-line"></div>
+      <button class="btn-link" onclick="loadAll()" style="border-color:transparent;color:var(--text)">↻ Refresh</button>
+    </div>
+    <div class="gyms-list" id="gyms-list">
+      <div class="empty">Loading...</div>
     </div>
 
   </div>
@@ -101,178 +208,150 @@
 
 <script>
 let adminToken = sessionStorage.getItem('adminToken');
+if (adminToken) { showApp(); loadAll(); }
 
-// Init
-if (adminToken) {
-  showAdminScreen();
-  loadGyms();
-} else {
-  showLoginScreen();
-}
+document.getElementById('token-input').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 
-function showLoginScreen() {
-  document.getElementById('login-screen').classList.remove('hidden');
-  document.getElementById('admin-screen').classList.add('hidden');
-}
-
-function showAdminScreen() {
-  document.getElementById('login-screen').classList.add('hidden');
-  document.getElementById('admin-screen').classList.remove('hidden');
-}
-
-async function login(e) {
-  e.preventDefault();
-  const token = document.getElementById('token-input').value;
-  const errorEl = document.getElementById('login-error');
-
+async function login() {
+  const token = document.getElementById('token-input').value.trim();
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!token) return;
   try {
-    const res = await fetch(`/admin/gyms?adminToken=${encodeURIComponent(token)}`);
+    const res = await fetch('/admin/gyms?adminToken=' + encodeURIComponent(token));
     if (res.ok) {
       adminToken = token;
       sessionStorage.setItem('adminToken', token);
-      errorEl.classList.add('hidden');
-      showAdminScreen();
-      loadGyms();
+      showApp(); loadAll();
     } else {
-      errorEl.textContent = 'Invalid token';
-      errorEl.classList.remove('hidden');
+      errEl.textContent = '// ACCESS DENIED — invalid token';
+      errEl.style.display = 'block';
     }
   } catch (err) {
-    errorEl.textContent = `Error: ${err.message}`;
-    errorEl.classList.remove('hidden');
+    errEl.textContent = '// CONNECTION ERROR: ' + err.message;
+    errEl.style.display = 'block';
   }
 }
 
 function logout() {
   adminToken = null;
   sessionStorage.removeItem('adminToken');
-  showLoginScreen();
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('admin-screen').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-screen').style.display = 'block';
+}
+
+function loadAll() { loadStats(); loadGyms(); }
+
+async function loadStats() {
+  try {
+    const res = await fetch('/admin/stats?adminToken=' + encodeURIComponent(adminToken));
+    if (!res.ok) return;
+    const d = await res.json();
+    document.getElementById('stat-gyms').textContent = d.totalGyms;
+    document.getElementById('stat-members').textContent = d.totalMembers;
+    document.getElementById('stat-active').textContent = d.activeGyms;
+    document.getElementById('stat-trialing').textContent = d.trialingGyms;
+    document.getElementById('stat-suspended').textContent = d.suspendedGyms;
+    document.getElementById('stat-revenue').textContent = '£' + ((d.totalRevenue || 0) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0 });
+  } catch {}
 }
 
 async function loadGyms() {
-  const tbody = document.getElementById('gyms-tbody');
-  tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-400">Loading...</td></tr>';
-
+  const list = document.getElementById('gyms-list');
+  list.innerHTML = '<div class="empty">Loading...</div>';
   try {
-    const res = await fetch(`/admin/gyms?adminToken=${encodeURIComponent(adminToken)}`);
-    if (!res.ok) throw new Error('Failed to load gyms');
-    
-    const data = await res.json();
-    const gyms = data.gyms || [];
-
-    if (gyms.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-400">No gyms yet</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = gyms.map(g => {
-      const statusColors = {
-        active: 'bg-green-100 text-green-700',
-        trialing: 'bg-blue-100 text-blue-700',
-        past_due: 'bg-yellow-100 text-yellow-700',
-        cancelled: 'bg-red-100 text-red-700',
-        suspended: 'bg-gray-100 text-gray-700',
-      };
-      const statusClass = statusColors[g.status] || 'bg-gray-100 text-gray-700';
-      const lastActivity = g.lastActivity ? new Date(g.lastActivity).toLocaleDateString() : 'Never';
-
-      return `
-        <tr class="hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm font-mono text-gray-900">${g.gymId}</td>
-          <td class="px-6 py-4 text-sm text-gray-900 font-medium">${g.gymName}</td>
-          <td class="px-6 py-4 text-sm text-gray-600 capitalize">${g.plan}</td>
-          <td class="px-6 py-4">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">
-              ${g.status}
-            </span>
-          </td>
-          <td class="px-6 py-4 text-sm text-gray-600">${g.memberCount}</td>
-          <td class="px-6 py-4 text-sm text-gray-500">${lastActivity}</td>
-          <td class="px-6 py-4 text-right text-sm">
-            ${g.status === 'suspended' 
-              ? `<button onclick="activateGym('${g.gymId}')" class="text-green-600 hover:text-green-700 font-medium">Activate</button>`
-              : `<button onclick="suspendGym('${g.gymId}')" class="text-red-600 hover:text-red-700 font-medium">Suspend</button>`
-            }
-          </td>
-        </tr>
-      `;
+    const res = await fetch('/admin/gyms?adminToken=' + encodeURIComponent(adminToken));
+    if (!res.ok) throw new Error('Failed to load');
+    const { gyms } = await res.json();
+    if (!gyms.length) { list.innerHTML = '<div class="empty">No gyms provisioned yet.</div>'; return; }
+    list.innerHTML = gyms.map(g => {
+      const base = 'https://' + g.gymId + '.cruxgym.co.uk';
+      const lastActivity = g.lastActivity ? new Date(g.lastActivity).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : 'No activity';
+      const trialInfo = g.trialEndsAt ? 'Trial ends ' + new Date(g.trialEndsAt).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '';
+      return `<div class="gym-card">
+        <div class="gym-id">${g.gymId}</div>
+        <div>
+          <div class="gym-name">${g.gymName}</div>
+          <div class="gym-meta">
+            <span class="badge badge-${g.status}">${g.status}</span>
+            <span class="gym-meta-item">${g.plan}</span>
+            <span class="gym-meta-item">${g.memberCount} members</span>
+            <span class="gym-meta-item">${lastActivity}</span>
+            ${trialInfo ? '<span class="gym-meta-item" style="color:var(--gold)">' + trialInfo + '</span>' : ''}
+          </div>
+        </div>
+        <div class="gym-actions">
+          <a href="${base}" target="_blank" class="btn-link">Staff App ↗</a>
+          <a href="${base}/me" target="_blank" class="btn-link gold">Member Portal ↗</a>
+          <a href="${base}/register" target="_blank" class="btn-link green">Register ↗</a>
+          <a href="${base}/admin" target="_blank" class="btn-link">Admin ↗</a>
+          <div class="divider"></div>
+          ${g.status === 'suspended'
+            ? '<button class="btn-succeed" onclick="activateGym(\'' + g.gymId + '\')">Activate</button>'
+            : '<button class="btn-danger" onclick="suspendGym(\'' + g.gymId + '\')">Suspend</button>'}
+        </div>
+      </div>`;
     }).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-red-500">Error: ${err.message}</td></tr>`;
+    list.innerHTML = '<div class="empty">Error: ' + err.message + '</div>';
   }
 }
 
-async function provisionGym(e) {
-  e.preventDefault();
+async function provisionGym() {
   const gymId = document.getElementById('provision-gym-id').value.trim().toLowerCase();
   const gymName = document.getElementById('provision-gym-name').value.trim();
   const ownerEmail = document.getElementById('provision-owner-email').value.trim();
-  const messageEl = document.getElementById('provision-message');
-
-  messageEl.textContent = 'Provisioning...';
-  messageEl.className = 'text-sm mt-3 text-gray-600';
-  messageEl.classList.remove('hidden');
-
+  const msgEl = document.getElementById('provision-msg');
+  if (!gymId || !gymName || !ownerEmail) {
+    msgEl.textContent = '// ERROR: all fields required';
+    msgEl.style.color = 'var(--red)';
+    msgEl.style.display = 'block';
+    return;
+  }
+  msgEl.textContent = '// DEPLOYING...';
+  msgEl.style.color = 'var(--blue)';
+  msgEl.style.display = 'block';
   try {
-    const res = await fetch(`/admin/provision?adminToken=${encodeURIComponent(adminToken)}`, {
+    const res = await fetch('/admin/provision?adminToken=' + encodeURIComponent(adminToken), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ gymId, gymName, ownerEmail }),
     });
-
     const data = await res.json();
-
     if (res.ok) {
-      messageEl.textContent = `✅ Success! ${gymName} provisioned at ${data.subdomain}. Welcome email sent to ${ownerEmail}.`;
-      messageEl.className = 'text-sm mt-3 text-green-600';
-      document.getElementById('provision-form').reset();
-      setTimeout(() => loadGyms(), 1000);
+      msgEl.textContent = '// SUCCESS — ' + gymName + ' deployed at ' + data.subdomain + '. Welcome email sent to ' + ownerEmail + '.';
+      msgEl.style.color = 'var(--green)';
+      document.getElementById('provision-gym-id').value = '';
+      document.getElementById('provision-gym-name').value = '';
+      document.getElementById('provision-owner-email').value = '';
+      setTimeout(() => loadAll(), 800);
     } else {
-      messageEl.textContent = `❌ Error: ${data.error}`;
-      messageEl.className = 'text-sm mt-3 text-red-600';
+      msgEl.textContent = '// ERROR: ' + data.error;
+      msgEl.style.color = 'var(--red)';
     }
   } catch (err) {
-    messageEl.textContent = `❌ Error: ${err.message}`;
-    messageEl.className = 'text-sm mt-3 text-red-600';
+    msgEl.textContent = '// CONNECTION ERROR: ' + err.message;
+    msgEl.style.color = 'var(--red)';
   }
 }
 
 async function suspendGym(gymId) {
-  if (!confirm(`Suspend ${gymId}? This will block all access.`)) return;
-
-  try {
-    const res = await fetch(`/admin/gyms/${gymId}/suspend?adminToken=${encodeURIComponent(adminToken)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: 'Manual suspension' }),
-    });
-
-    if (res.ok) {
-      loadGyms();
-    } else {
-      alert('Failed to suspend gym');
-    }
-  } catch (err) {
-    alert(`Error: ${err.message}`);
-  }
+  if (!confirm('Suspend ' + gymId + '? This blocks all access.')) return;
+  await fetch('/admin/gyms/' + gymId + '/suspend?adminToken=' + encodeURIComponent(adminToken), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'Manual suspension' }),
+  });
+  loadAll();
 }
 
 async function activateGym(gymId) {
-  try {
-    const res = await fetch(`/admin/gyms/${gymId}/activate?adminToken=${encodeURIComponent(adminToken)}`, {
-      method: 'POST',
-    });
-
-    if (res.ok) {
-      loadGyms();
-    } else {
-      alert('Failed to activate gym');
-    }
-  } catch (err) {
-    alert(`Error: ${err.message}`);
-  }
+  await fetch('/admin/gyms/' + gymId + '/activate?adminToken=' + encodeURIComponent(adminToken), { method: 'POST' });
+  loadAll();
 }
 </script>
-
 </body>
 </html>
