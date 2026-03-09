@@ -65,6 +65,82 @@ router.post('/auth/password', (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ── Staff invite flow ──────────────────────────────────────────────────────
+
+router.post('/:id/invite', async (req, res, next) => {
+  try {
+    const staff = Staff.getById(req.params.id);
+    if (!staff) return res.status(404).json({ error: 'Staff member not found' });
+    if (!staff.email) return res.status(400).json({ error: 'This staff member has no email address. Add one first.' });
+
+    const token = Staff.generateInviteToken(req.params.id);
+
+    // Build invite link
+    const host = req.get('host') || 'localhost:8080';
+    const protocol = req.protocol || 'http';
+    const inviteUrl = `${protocol}://${host}/invite?token=${token}`;
+
+    // Send email
+    try {
+      const { getDb } = require('../main/database/db');
+      const nodemailer = require('nodemailer');
+      const db = getDb();
+      const getSetting = (k) => db.prepare('SELECT value FROM settings WHERE key = ?').get(k)?.value || '';
+      const gymName = getSetting('gym_name') || 'Your Gym';
+      const smtpUser = getSetting('email_smtp_user');
+      const smtpPass = getSetting('email_smtp_pass');
+
+      if (smtpUser && smtpPass) {
+        const transporter = nodemailer.createTransport({
+          host: getSetting('email_smtp_host') || 'smtp.gmail.com',
+          port: parseInt(getSetting('email_smtp_port') || '587'),
+          secure: false,
+          auth: { user: smtpUser, pass: smtpPass },
+        });
+        await transporter.sendMail({
+          from: getSetting('email_from') || smtpUser,
+          to: staff.email,
+          subject: `You've been invited to ${gymName} on Crux`,
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;">
+              <h2 style="color:#1E3A5F;">${gymName}</h2>
+              <p>Hi ${staff.first_name},</p>
+              <p>You've been added as <strong>${staff.role.replace('_', ' ')}</strong> on Crux for ${gymName}.</p>
+              <p>Click the button below to set your password and activate your account:</p>
+              <a href="${inviteUrl}" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#1E3A5F;color:white;border-radius:8px;text-decoration:none;font-weight:600;">Accept Invitation</a>
+              <p style="color:#888;font-size:12px;">This link expires in 7 days. If you didn't expect this email, you can ignore it.</p>
+            </div>`,
+        });
+      }
+    } catch (emailErr) {
+      console.warn('[staff] invite email failed:', emailErr.message);
+    }
+
+    res.json({ ok: true, inviteUrl });
+  } catch (e) { next(e); }
+});
+
+// Validate invite token (public — before billing gate)
+router.get('/invite/validate', (req, res, next) => {
+  try {
+    const staff = Staff.getByInviteToken(req.query.token);
+    if (!staff) return res.status(404).json({ error: 'Invalid or expired invite link' });
+    res.json({ staff: { first_name: staff.first_name, last_name: staff.last_name, role: staff.role, email: staff.email } });
+  } catch (e) { next(e); }
+});
+
+// Accept invite — set password
+router.post('/invite/accept', (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ error: 'token and password required' });
+    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    const staff = Staff.acceptInvite(token, password);
+    if (!staff) return res.status(404).json({ error: 'Invalid or expired invite link' });
+    res.json({ ok: true, staff });
+  } catch (e) { next(e); }
+});
+
 router.get('/:id/has-permission/:perm', (req, res, next) => {
   try { res.json({ allowed: Staff.hasPermission(req.params.id, req.params.perm) }); } catch (e) { next(e); }
 });

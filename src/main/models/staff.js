@@ -200,6 +200,34 @@ const Staff = {
     return !!staff.permissions[permission];
   },
 
+  generateInviteToken(staffId) {
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    getDb().prepare('UPDATE staff SET invite_token = ?, invite_expires_at = ?, invite_accepted = 0 WHERE id = ?')
+      .run(token, expires, staffId);
+    return token;
+  },
+
+  getByInviteToken(token) {
+    const staff = getDb().prepare('SELECT * FROM staff WHERE invite_token = ? AND invite_accepted = 0').get(token);
+    if (!staff) return null;
+    if (staff.invite_expires_at && new Date(staff.invite_expires_at) < new Date()) return null;
+    staff.permissions = JSON.parse(staff.permissions_json || '{}');
+    delete staff.password_hash;
+    delete staff.pin_hash;
+    return staff;
+  },
+
+  acceptInvite(token, password) {
+    const db = getDb();
+    const staff = db.prepare('SELECT * FROM staff WHERE invite_token = ? AND invite_accepted = 0').get(token);
+    if (!staff) return null;
+    if (staff.invite_expires_at && new Date(staff.invite_expires_at) < new Date()) return null;
+    db.prepare('UPDATE staff SET password_hash = ?, invite_accepted = 1, invite_token = NULL, invite_expires_at = NULL WHERE id = ?')
+      .run(hashPassword(password), staff.id);
+    return this.getById(staff.id);
+  },
+
   getDefaultPermissions(role) {
     return DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.centre_assistant;
   },

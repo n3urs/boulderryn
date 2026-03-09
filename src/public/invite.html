@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accept Invitation — Crux</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+
+  <div class="w-full max-w-sm">
+    <div class="text-center mb-6">
+      <div class="flex items-center justify-center gap-2 mb-2">
+        <div class="w-8 h-8 bg-[#1E3A5F] rounded-lg flex items-center justify-center">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l14 9-14 9V3z"/></svg>
+        </div>
+        <span class="text-lg font-bold text-gray-900">Crux</span>
+      </div>
+    </div>
+
+    <!-- Loading state -->
+    <div id="state-loading" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
+      <p class="text-gray-400 text-sm">Checking your invite...</p>
+    </div>
+
+    <!-- Invalid token -->
+    <div id="state-invalid" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center hidden">
+      <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">Invite link invalid</h2>
+      <p class="text-gray-500 text-sm">This link has expired or already been used. Ask your manager to send a new invite.</p>
+    </div>
+
+    <!-- Set password form -->
+    <div id="state-form" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 hidden">
+      <h2 class="text-xl font-bold text-gray-900 mb-1">Set your password</h2>
+      <p class="text-gray-500 text-sm mb-6" id="invite-desc">You've been invited to join your gym on Crux.</p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Password</label>
+          <input type="password" id="password" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#1E3A5F]" placeholder="At least 8 characters" autofocus>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Confirm Password</label>
+          <input type="password" id="password-confirm" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#1E3A5F]" placeholder="Repeat password">
+        </div>
+        <p id="form-error" class="text-red-500 text-xs hidden"></p>
+        <button onclick="acceptInvite()" class="w-full py-3 bg-[#1E3A5F] hover:bg-[#2A4D7A] text-white font-semibold rounded-xl transition text-sm">
+          Activate My Account
+        </button>
+      </div>
+    </div>
+
+    <!-- Success -->
+    <div id="state-success" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center hidden">
+      <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      </div>
+      <h2 class="text-lg font-bold text-gray-900 mb-2">You're all set!</h2>
+      <p class="text-gray-500 text-sm mb-5">Your account is active. You can now sign in with your email and password.</p>
+      <a href="/" class="inline-block px-6 py-3 bg-[#1E3A5F] text-white font-semibold rounded-xl text-sm hover:bg-[#2A4D7A] transition">Go to Dashboard</a>
+    </div>
+  </div>
+
+  <script>
+    const token = new URLSearchParams(location.search).get('token');
+
+    function show(id) {
+      ['state-loading','state-invalid','state-form','state-success'].forEach(s => {
+        document.getElementById(s).classList.toggle('hidden', s !== id);
+      });
+    }
+
+    async function init() {
+      if (!token) { show('state-invalid'); return; }
+      try {
+        const res = await fetch(`/api/staff/invite/validate?token=${encodeURIComponent(token)}`);
+        if (!res.ok) { show('state-invalid'); return; }
+        const { staff } = await res.json();
+        document.getElementById('invite-desc').textContent =
+          `Hi ${staff.first_name}, you've been added as ${staff.role.replace(/_/g,' ')} on Crux.`;
+        show('state-form');
+      } catch { show('state-invalid'); }
+    }
+
+    async function acceptInvite() {
+      const password = document.getElementById('password').value;
+      const confirm  = document.getElementById('password-confirm').value;
+      const errEl    = document.getElementById('form-error');
+
+      errEl.classList.add('hidden');
+      if (password.length < 8) { errEl.textContent = 'Password must be at least 8 characters'; errEl.classList.remove('hidden'); return; }
+      if (password !== confirm) { errEl.textContent = 'Passwords do not match'; errEl.classList.remove('hidden'); return; }
+
+      try {
+        const res = await fetch('/api/staff/invite/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.error || 'Something went wrong'; errEl.classList.remove('hidden'); return; }
+        show('state-success');
+      } catch { errEl.textContent = 'Network error. Please try again.'; errEl.classList.remove('hidden'); }
+    }
+
+    document.getElementById('password-confirm').addEventListener('keydown', e => {
+      if (e.key === 'Enter') acceptInvite();
+    });
+
+    init();
+  </script>
+</body>
+</html>

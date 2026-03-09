@@ -97,8 +97,19 @@ function getDb() {
     console.log(`[db] Fresh database for gym "${gymId}" — schema applied.`);
   }
 
+  // Run column migrations for DBs created before new columns were added
+  runMigrations(db);
+
   connections.set(gymId, db);
   return db;
+}
+
+function runMigrations(db) {
+  // ALTER TABLE ADD COLUMN throws if column already exists — try/catch each one
+  const tryAdd = (sql) => { try { db.exec(sql); } catch (_) {} };
+  tryAdd('ALTER TABLE staff ADD COLUMN invite_token TEXT');
+  tryAdd('ALTER TABLE staff ADD COLUMN invite_expires_at TEXT');
+  tryAdd('ALTER TABLE staff ADD COLUMN invite_accepted INTEGER DEFAULT 0');
 }
 
 /**

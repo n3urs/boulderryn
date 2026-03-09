@@ -80,9 +80,12 @@ app.get('/admin', (req, res) => {
 });
 app.use('/admin', requireAdmin, require('./src/routes/admin'));
 
-// ── Self-serve signup (before gym context — no gym yet) ───────────────────
+// ── Self-serve signup + invite (before gym context) ───────────────────────
 app.get('/signup', (req, res) => {
   res.sendFile(path.join(__dirname, 'src', 'public', 'signup.html'));
+});
+app.get('/invite', (req, res) => {
+  res.sendFile(path.join(__dirname, 'src', 'public', 'invite.html'));
 });
 app.use('/api/signup', require('./src/routes/signup'));
 
@@ -140,9 +143,10 @@ app.use((req, res, next) => {
 // ── Billing gate (applied to all /api routes except auth) ─────────────────
 const requireBilling = require('./src/middleware/requireBilling');
 app.use('/api', (req, res, next) => {
-  // Auth routes and gym-info must always be accessible
+  // Auth and invite routes must always be accessible regardless of billing
   if (
     req.path.startsWith('/staff/auth') ||
+    req.path.startsWith('/staff/invite') ||
     req.path.startsWith('/climber/auth') ||
     req.path.startsWith('/gym-info') ||
     req.path.startsWith('/signup')

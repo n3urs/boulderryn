@@ -121,20 +121,23 @@ function saveSession(staff) {
   localStorage.setItem('crux_staff_session', JSON.stringify({ ...staff, savedAt: Date.now() }));
   window.currentStaff = staff;
   renderStaffWidget();
+  applyNavPermissions();
 }
 
 function clearSession() {
   localStorage.removeItem('crux_staff_session');
   window.currentStaff = null;
   renderStaffWidget();
+  applyNavPermissions();
 }
 
 function restoreSession() {
   const s = getSession();
-  if (!s) { renderStaffWidget(); return; }
+  if (!s) { renderStaffWidget(); applyNavPermissions(); return; }
   if (s.savedAt && Date.now() - s.savedAt > 12 * 60 * 60 * 1000) { clearSession(); return; }
   window.currentStaff = s;
   renderStaffWidget();
+  applyNavPermissions();
 }
 
 function hasPermission(staff, permission) {
@@ -147,6 +150,29 @@ function logout() {
   clearSession();
   showToast('Signed out', 'success');
   setTimeout(() => location.reload(), 600);
+}
+
+// Map of page name → permission key required to VIEW that nav item
+const NAV_PERMISSIONS = {
+  dashboard: null,       // always visible
+  members:   'members_view',
+  pos:       'pos',
+  events:    'events_view',
+  routes:    'routes_view',
+  analytics: 'analytics',
+  staff:     'settings',
+};
+
+function applyNavPermissions() {
+  const staff = window.currentStaff;
+  document.querySelectorAll('#nav-links [data-page]').forEach(link => {
+    const page = link.dataset.page;
+    const perm = NAV_PERMISSIONS[page];
+    if (!perm) { link.parentElement.style.display = ''; return; } // always show
+    if (!staff) { link.parentElement.style.display = ''; return; } // logged out: show all (login prompt on click)
+    const show = hasPermission(staff, perm);
+    link.parentElement.style.display = show ? '' : 'none';
+  });
 }
 
 function renderStaffWidget() {
@@ -289,6 +315,61 @@ function cancelPinChallenge() {
   _challengeCallback = null;
   _challengePermission = null;
   _challengePinValue = '';
+}
+
+async function attemptEmailLogin() {
+  const email    = document.getElementById('email-login-input')?.value?.trim();
+  const password = document.getElementById('email-login-password')?.value;
+  const errEl    = document.getElementById('email-login-error');
+  if (!email || !password) { errEl.textContent = 'Enter email and password'; return; }
+  errEl.textContent = '';
+
+  try {
+    const result = await api('POST', '/api/staff/auth/password', { email, password });
+    if (result.error) { errEl.textContent = 'Invalid email or password'; return; }
+
+    saveSession(result);
+
+    if (_challengePermission && !hasPermission(result, _challengePermission)) {
+      document.getElementById('pin-challenge-overlay').style.display = 'none';
+      showToast(`${result.first_name} doesn't have permission for this`, 'error');
+      _challengeCallback = null;
+      _challengePermission = null;
+      return;
+    }
+
+    document.getElementById('pin-challenge-overlay').style.display = 'none';
+    if (_challengeCallback) _challengeCallback(result);
+    _challengeCallback = null;
+    _challengePermission = null;
+  } catch (err) {
+    errEl.textContent = 'Authentication failed';
+  }
+}
+
+function showEmailLoginForm() {
+  const modal = document.getElementById('pin-challenge-overlay').querySelector('.bg-slate-800');
+  if (!modal) return;
+  modal.innerHTML = `
+    <div class="text-center mb-4">
+      <p class="text-white font-semibold">Sign in with email</p>
+    </div>
+    <div class="space-y-3">
+      <input type="email" id="email-login-input" placeholder="your@email.com" autocomplete="email"
+        class="w-full px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500">
+      <input type="password" id="email-login-password" placeholder="Password" autocomplete="current-password"
+        class="w-full px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 text-sm focus:outline-none focus:border-blue-500">
+      <p id="email-login-error" class="text-red-400 text-xs min-h-4"></p>
+      <button onclick="attemptEmailLogin()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition text-sm">Sign in</button>
+    </div>
+    <div class="mt-3 text-center">
+      <button onclick="cancelPinChallenge()" class="text-slate-400 hover:text-white text-sm transition">Cancel</button>
+    </div>
+  `;
+  setTimeout(() => document.getElementById('email-login-input')?.focus(), 50);
+  document.getElementById('email-login-password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') attemptEmailLogin();
+  });
 }
 
 // ============================================================
@@ -4653,6 +4734,9 @@ async function loadStaffManagement() {
                         <button onclick="resetStaffPin('${s.id}', '${s.first_name}')" class="p-1.5 rounded-lg hover:bg-yellow-50 text-gray-400 hover:text-yellow-600 transition" title="Reset PIN">
                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                         </button>
+                        ${s.email ? `<button onclick="sendStaffInvite('${s.id}', '${s.first_name}')" class="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition" title="Send invite email">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        </button>` : ''}
                         ${s.is_active
                           ? `<button onclick="toggleStaffStatus('${s.id}', false)" class="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition" title="Deactivate"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg></button>`
                           : `<button onclick="toggleStaffStatus('${s.id}', true)" class="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-600 transition" title="Activate"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>`}
@@ -4860,6 +4944,22 @@ async function toggleStaffStatus(staffId, activate) {
     }
     loadStaffManagement();
   } catch (err) { showToast('Error: ' + err.message, 'error'); }
+}
+
+async function sendStaffInvite(staffId, firstName) {
+  if (!confirm(`Send an invite email to ${firstName}? They'll get a link to set their password.`)) return;
+  try {
+    const data = await api('POST', `/api/staff/${staffId}/invite`);
+    if (data.ok) {
+      showToast(`Invite sent to ${firstName}`, 'success');
+      // Show the invite URL in case email isn't configured
+      if (data.inviteUrl) {
+        console.log('Invite URL (fallback):', data.inviteUrl);
+      }
+    }
+  } catch (err) {
+    showToast('Error sending invite: ' + err.message, 'error');
+  }
 }
 
 // ---- General Settings Tab ----

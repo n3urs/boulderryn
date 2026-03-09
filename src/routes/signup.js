@@ -49,7 +49,7 @@ router.post('/check-availability', (req, res) => {
 // ── POST /api/signup/create ────────────────────────────────────────────────
 
 router.post('/create', async (req, res) => {
-  const { gymId, gymName, ownerEmail, plan: planId } = req.body;
+  const { gymId, gymName, ownerEmail, ownerPassword, ownerFirstName, ownerLastName, plan: planId } = req.body;
 
   if (!gymId || !gymName || !ownerEmail) {
     return res.status(400).json({ error: 'gymId, gymName, and ownerEmail are required' });
@@ -70,7 +70,31 @@ router.post('/create', async (req, res) => {
       return res.status(500).json({ error: result.message });
     }
 
-    // 2. Send welcome email (best-effort)
+    // 2. Create owner account in the new gym's DB (if details provided)
+    if (ownerFirstName && ownerEmail) {
+      try {
+        const { gymContext } = require('../main/database/gymContext');
+        const { getDb } = require('../main/database/db');
+        const Staff = require('../main/models/staff');
+        gymContext.run({ gymId }, () => {
+          getDb(); // ensure connection
+          const existing = getDb().prepare('SELECT COUNT(*) as c FROM staff WHERE role = ?').get('owner');
+          if (existing.c === 0) {
+            Staff.create({
+              first_name: ownerFirstName,
+              last_name: ownerLastName || '',
+              email: ownerEmail,
+              role: 'owner',
+              password: ownerPassword || undefined,
+            });
+          }
+        });
+      } catch (ownerErr) {
+        console.warn('[signup] owner account creation failed:', ownerErr.message);
+      }
+    }
+
+    // 4. Send welcome email (best-effort)
     try {
       await sendWelcomeEmail(gymId, gymName, ownerEmail);
     } catch (emailErr) {
