@@ -17,7 +17,7 @@ const gymContext = require('./gymContext');
 const Database = require('better-sqlite3');
 
 function getDataRoot() {
-  return process.env.DYNAMIC_DATA_DIR || process.env.BOULDERRYN_DATA_DIR || path.join(__dirname, '..', '..', '..', 'data');
+  return process.env.CRUX_DATA_DIR || process.env.BOULDERRYN_DATA_DIR || path.join(__dirname, '..', '..', '..', 'data');
 }
 
 // One open connection per gym_id, kept for the process lifetime

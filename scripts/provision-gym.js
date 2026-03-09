@@ -44,7 +44,7 @@ if (!/^[a-z0-9-]{2,30}$/.test(gymId)) {
 
 // ── Paths ──────────────────────────────────────────────────────────────────
 
-const dataRoot = process.env.DYNAMIC_DATA_DIR || process.env.BOULDERRYN_DATA_DIR || path.join(__dirname, '..', 'data');
+const dataRoot = process.env.CRUX_DATA_DIR || process.env.BOULDERRYN_DATA_DIR || path.join(__dirname, '..', 'data');
 const gymDir = path.join(dataRoot, 'gyms', gymId);
 const photosDir = path.join(gymDir, 'photos');
 const dbPath = path.join(gymDir, 'gym.db');

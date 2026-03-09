@@ -9,7 +9,7 @@ const fs = require('fs');
 
 // In Electron, we'd use app.getPath('userData')
 // For standalone init, use a local data directory
-const DATA_DIR = process.env.DYNAMIC_DATA_DIR || process.env.BOULDERRYN_DATA_DIR || path.join(__dirname, '..', '..', '..', 'data');
+const DATA_DIR = process.env.CRUX_DATA_DIR || process.env.BOULDERRYN_DATA_DIR || path.join(__dirname, '..', '..', '..', 'data');
 const LEGACY_DB_PATH = path.join(DATA_DIR, 'boulderryn.db');
 const DB_PATH = path.join(DATA_DIR, 'gym.db');
 // Auto-migrate legacy DB filename on first run
