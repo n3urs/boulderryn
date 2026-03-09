@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crux Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="bg-gray-50">
+
+<!-- Login Screen -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center px-4">
+  <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
+    <h1 class="text-2xl font-bold text-gray-900 mb-2 text-center">Crux Admin</h1>
+    <p class="text-gray-500 text-center mb-6">Platform Management</p>
+    
+    <form id="login-form" onsubmit="login(event)">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Admin Token</label>
+      <input type="password" id="token-input" required
+        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
+        placeholder="Enter admin token">
+      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition">
+        Log In
+      </button>
+      <p id="login-error" class="text-red-500 text-sm mt-2 hidden"></p>
+    </form>
+  </div>
+</div>
+
+<!-- Admin Dashboard -->
+<div id="admin-screen" class="hidden min-h-screen">
+  <!-- Header -->
+  <nav class="bg-white border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <h1 class="text-xl font-bold text-gray-900">Crux Admin</h1>
+      <button onclick="logout()" class="text-sm text-gray-600 hover:text-gray-900 transition">Log Out</button>
+    </div>
+  </nav>
+
+  <div class="max-w-7xl mx-auto px-6 py-8">
+    
+    <!-- Provision Form -->
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">Provision New Gym</h2>
+      <form id="provision-form" onsubmit="provisionGym(event)" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <input type="text" id="provision-gym-id" required pattern="[a-z0-9-]+" 
+          placeholder="Gym ID (e.g. climbhigh)" 
+          class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+        <input type="text" id="provision-gym-name" required 
+          placeholder="Gym Name (e.g. Climb High)" 
+          class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+        <input type="email" id="provision-owner-email" required 
+          placeholder="Owner Email" 
+          class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition">
+          Provision Gym
+        </button>
+      </form>
+      <p id="provision-message" class="text-sm mt-3 hidden"></p>
+    </div>
+
+    <!-- Gyms Table -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-gray-900">All Gyms</h2>
+        <button onclick="loadGyms()" class="text-sm text-gray-600 hover:text-gray-900 transition">
+          <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Refresh
+        </button>
+      </div>
+      
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="text-left text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
+              <th class="px-6 py-3 font-medium">Gym ID</th>
+              <th class="px-6 py-3 font-medium">Name</th>
+              <th class="px-6 py-3 font-medium">Plan</th>
+              <th class="px-6 py-3 font-medium">Status</th>
+              <th class="px-6 py-3 font-medium">Members</th>
+              <th class="px-6 py-3 font-medium">Last Activity</th>
+              <th class="px-6 py-3 font-medium text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="gyms-tbody" class="divide-y divide-gray-100">
+            <tr>
+              <td colspan="7" class="px-6 py-8 text-center text-gray-400">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let adminToken = sessionStorage.getItem('adminToken');
+
+// Init
+if (adminToken) {
+  showAdminScreen();
+  loadGyms();
+} else {
+  showLoginScreen();
+}
+
+function showLoginScreen() {
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('admin-screen').classList.add('hidden');
+}
+
+function showAdminScreen() {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('admin-screen').classList.remove('hidden');
+}
+
+async function login(e) {
+  e.preventDefault();
+  const token = document.getElementById('token-input').value;
+  const errorEl = document.getElementById('login-error');
+
+  try {
+    const res = await fetch(`/admin/gyms?adminToken=${encodeURIComponent(token)}`);
+    if (res.ok) {
+      adminToken = token;
+      sessionStorage.setItem('adminToken', token);
+      errorEl.classList.add('hidden');
+      showAdminScreen();
+      loadGyms();
+    } else {
+      errorEl.textContent = 'Invalid token';
+      errorEl.classList.remove('hidden');
+    }
+  } catch (err) {
+    errorEl.textContent = `Error: ${err.message}`;
+    errorEl.classList.remove('hidden');
+  }
+}
+
+function logout() {
+  adminToken = null;
+  sessionStorage.removeItem('adminToken');
+  showLoginScreen();
+}
+
+async function loadGyms() {
+  const tbody = document.getElementById('gyms-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-400">Loading...</td></tr>';
+
+  try {
+    const res = await fetch(`/admin/gyms?adminToken=${encodeURIComponent(adminToken)}`);
+    if (!res.ok) throw new Error('Failed to load gyms');
+    
+    const data = await res.json();
+    const gyms = data.gyms || [];
+
+    if (gyms.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-400">No gyms yet</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = gyms.map(g => {
+      const statusColors = {
+        active: 'bg-green-100 text-green-700',
+        trialing: 'bg-blue-100 text-blue-700',
+        past_due: 'bg-yellow-100 text-yellow-700',
+        cancelled: 'bg-red-100 text-red-700',
+        suspended: 'bg-gray-100 text-gray-700',
+      };
+      const statusClass = statusColors[g.status] || 'bg-gray-100 text-gray-700';
+      const lastActivity = g.lastActivity ? new Date(g.lastActivity).toLocaleDateString() : 'Never';
+
+      return `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm font-mono text-gray-900">${g.gymId}</td>
+          <td class="px-6 py-4 text-sm text-gray-900 font-medium">${g.gymName}</td>
+          <td class="px-6 py-4 text-sm text-gray-600 capitalize">${g.plan}</td>
+          <td class="px-6 py-4">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">
+              ${g.status}
+            </span>
+          </td>
+          <td class="px-6 py-4 text-sm text-gray-600">${g.memberCount}</td>
+          <td class="px-6 py-4 text-sm text-gray-500">${lastActivity}</td>
+          <td class="px-6 py-4 text-right text-sm">
+            ${g.status === 'suspended' 
+              ? `<button onclick="activateGym('${g.gymId}')" class="text-green-600 hover:text-green-700 font-medium">Activate</button>`
+              : `<button onclick="suspendGym('${g.gymId}')" class="text-red-600 hover:text-red-700 font-medium">Suspend</button>`
+            }
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-red-500">Error: ${err.message}</td></tr>`;
+  }
+}
+
+async function provisionGym(e) {
+  e.preventDefault();
+  const gymId = document.getElementById('provision-gym-id').value.trim().toLowerCase();
+  const gymName = document.getElementById('provision-gym-name').value.trim();
+  const ownerEmail = document.getElementById('provision-owner-email').value.trim();
+  const messageEl = document.getElementById('provision-message');
+
+  messageEl.textContent = 'Provisioning...';
+  messageEl.className = 'text-sm mt-3 text-gray-600';
+  messageEl.classList.remove('hidden');
+
+  try {
+    const res = await fetch(`/admin/provision?adminToken=${encodeURIComponent(adminToken)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gymId, gymName, ownerEmail }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      messageEl.textContent = `✅ Success! ${gymName} provisioned at ${data.subdomain}. Welcome email sent to ${ownerEmail}.`;
+      messageEl.className = 'text-sm mt-3 text-green-600';
+      document.getElementById('provision-form').reset();
+      setTimeout(() => loadGyms(), 1000);
+    } else {
+      messageEl.textContent = `❌ Error: ${data.error}`;
+      messageEl.className = 'text-sm mt-3 text-red-600';
+    }
+  } catch (err) {
+    messageEl.textContent = `❌ Error: ${err.message}`;
+    messageEl.className = 'text-sm mt-3 text-red-600';
+  }
+}
+
+async function suspendGym(gymId) {
+  if (!confirm(`Suspend ${gymId}? This will block all access.`)) return;
+
+  try {
+    const res = await fetch(`/admin/gyms/${gymId}/suspend?adminToken=${encodeURIComponent(adminToken)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Manual suspension' }),
+    });
+
+    if (res.ok) {
+      loadGyms();
+    } else {
+      alert('Failed to suspend gym');
+    }
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  }
+}
+
+async function activateGym(gymId) {
+  try {
+    const res = await fetch(`/admin/gyms/${gymId}/activate?adminToken=${encodeURIComponent(adminToken)}`, {
+      method: 'POST',
+    });
+
+    if (res.ok) {
+      loadGyms();
+    } else {
+      alert('Failed to activate gym');
+    }
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  }
+}
+</script>
+
+</body>
+</html>

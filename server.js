@@ -57,6 +57,10 @@ const authLimiter = rateLimit({
 //   STRIPE_PRICE_GROWTH     — Stripe Price ID for Growth plan
 //   STRIPE_PRICE_SCALE      — Stripe Price ID for Scale plan
 
+// ── Admin token (super-admin panel) ────────────────────────────────────────
+// Set ADMIN_TOKEN in environment to secure the admin panel
+process.env.ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'admin_secret_placeholder';
+
 // ── Middleware ─────────────────────────────────────────────────────────────
 
 // Webhook route needs raw body — must be registered before express.json()
@@ -67,6 +71,13 @@ app.use(express.urlencoded({ extended: true }));
 
 // ── Billing routes (platform-level, before gym context) ───────────────────
 app.use('/billing', require('./src/routes/billing').router);
+
+// ── Admin routes (super-admin panel, before gym context) ──────────────────
+const requireAdmin = require('./src/middleware/requireAdmin');
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'src', 'public', 'admin.html'));
+});
+app.use('/admin', requireAdmin, require('./src/routes/admin'));
 
 // ── Gym context middleware ─────────────────────────────────────────────────
 // Resolves the active gym_id from the request subdomain and threads it
