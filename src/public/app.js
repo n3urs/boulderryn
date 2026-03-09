@@ -259,11 +259,12 @@ function showFirstRunSetup() {
           <label class="block text-xs text-slate-400 mb-1">4-Digit PIN (e.g. birthday DDMM)</label>
           <input type="tel" id="fr-pin" maxlength="4" inputmode="numeric" class="w-full px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center text-xl tracking-[0.5em] font-mono" placeholder="••••">
         </div>
-        <div id="first-run-error" class="text-red-400 text-sm mb-3 hidden"></div>
-        <button type="button" onclick="handleFirstRunSetup()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition">Create Owner Account</button>
+        <div id="first-run-error" class="text-red-400 text-sm mb-3" style="display:none;"></div>
+        <button id="fr-submit" type="button" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition">Create Owner Account</button>
       </div>
     </div>
   `;
+  document.getElementById('fr-submit').addEventListener('click', handleFirstRunSetup);
 }
 
 async function handleFirstRunSetup() {
@@ -273,11 +274,11 @@ async function handleFirstRunSetup() {
   const pin       = document.getElementById('fr-pin').value.trim();
   const errEl     = document.getElementById('first-run-error');
 
-  // Validate in JS — no reliance on browser form validation
-  if (!firstName || !lastName) { errEl.textContent = 'First and last name are required.'; errEl.classList.remove('hidden'); return; }
-  if (!email || !email.includes('@')) { errEl.textContent = 'Enter a valid email address.'; errEl.classList.remove('hidden'); return; }
-  if (!/^\d{4}$/.test(pin)) { errEl.textContent = 'PIN must be exactly 4 digits.'; errEl.classList.remove('hidden'); return; }
-  errEl.classList.add('hidden');
+  // Validate in JS
+  if (!firstName || !lastName) { errEl.textContent = 'First and last name are required.'; errEl.style.display = 'block'; return; }
+  if (!email || !email.includes('@')) { errEl.textContent = 'Enter a valid email address.'; errEl.style.display = 'block'; return; }
+  if (!/^\d{4}$/.test(pin)) { errEl.textContent = 'PIN must be exactly 4 digits.'; errEl.style.display = 'block'; return; }
+  errEl.style.display = 'none';
 
   const btn = document.querySelector('#first-run-fields button');
   btn.disabled = true;
@@ -290,7 +291,7 @@ async function handleFirstRunSetup() {
     navigateTo('dashboard');
   } catch (err) {
     errEl.textContent = err.message || 'Failed to create account';
-    errEl.classList.remove('hidden');
+    errEl.style.display = 'block';
     btn.disabled = false;
     btn.textContent = 'Create Owner Account';
   }
