@@ -52,6 +52,8 @@ boulderryn-project/          ← repo root (yes, old name, rename is pending)
 │   ├── routes/
 │   │   ├── admin.js             ← super-admin panel API
 │   │   ├── billing.js           ← Stripe billing routes
+│   │   ├── signup.js            ← self-serve gym signup + Stripe checkout creation
+│   │   ├── export.js            ← GDPR data export (JSON + CSV)
 │   │   ├── members.js, staff.js, pos.js, waivers.js, etc.
 │   │   └── onboarding.js        ← onboarding status + dismiss
 │   ├── config/
@@ -62,6 +64,7 @@ boulderryn-project/          ← repo root (yes, old name, rename is pending)
 │       ├── index.html           ← login/setup page
 │       ├── app.html             ← main SPA shell
 │       ├── app.js               ← entire SPA frontend (large file)
+│       ├── signup.html          ← self-serve gym owner signup page
 │       ├── register.html        ← public member registration + waiver page
 │       └── admin.html           ← super-admin panel UI
 ├── data/
@@ -70,6 +73,7 @@ boulderryn-project/          ← repo root (yes, old name, rename is pending)
 │       └── {gym_id}/
 │           ├── gym.db           ← per-gym database
 │           └── photos/          ← member photos
+├── crux-app.service             ← systemd service file (copy to /etc/systemd/system/)
 ├── DEVELOPMENT.md               ← dev setup, architecture notes
 ├── PRODUCT.md                   ← product spec, feature list
 ├── BILLING.md                   ← Stripe billing implementation notes
@@ -140,61 +144,73 @@ node scripts/provision-gym.js mygym "My Gym Name"
 - ✅ Stripe billing infrastructure — plans, checkout, portal, webhook handler, Billing tab in Settings
 - ✅ Super-admin panel — `/admin` with gym list, provision form, suspend/activate
 - ✅ Welcome email — sent to new gym owners on provisioning (subdomain URL, trial info, next steps)
-- ✅ `requireBilling` middleware — exists but NOT wired into routes yet (see below)
+- ✅ `requireBilling` middleware — wired into all `/api` routes (exempts `/staff/auth`, `/climber/auth`, `/gym-info`)
+- ✅ Self-serve signup — `/signup` page with gym name, subdomain picker, plan selection → Stripe checkout
+- ✅ Logo upload — Settings → General, stored as base64, shown in sidebar
+- ✅ GDPR data export — Settings → General, `/api/export/gdpr` (JSON) + `/api/export/members.csv`
+- ✅ systemd service file — `crux-app.service` in repo root, ready to deploy to `/etc/systemd/system/`
 
 ---
 
 ## What Still Needs Doing (Priority Order)
 
-### 1. Wire in billing gating (high priority)
-`src/middleware/requireBilling.js` exists but is not applied to any routes yet. Gyms can use the platform indefinitely without paying.
-
-To wire it in: in `server.js`, add `requireBilling` to the gym API routes after the gym context middleware:
-```js
-const requireBilling = require('./src/middleware/requireBilling');
-app.use('/api', gymContextMiddleware, requireBilling, gymRoutes);
-```
-
-Be careful: do NOT apply it to `/api/auth`, `/api/gym-info`, `/billing/*`, `/admin/*`, or the public register page.
-
-### 2. Real Stripe keys
+### 1. Real Stripe keys (BLOCKER for end-to-end testing)
 Oscar needs to:
 1. Create a Stripe account at stripe.com
-2. Create 3 products/prices (Starter £59/mo, Growth £99/mo, Scale £149/mo) 
+2. Create 3 products/prices (Starter £59/mo, Growth £99/mo, Scale £149/mo)
 3. Set env vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_GROWTH`, `STRIPE_PRICE_SCALE`
 4. Configure Stripe webhook endpoint: `https://cruxgym.co.uk/billing/webhook`
 
-### 3. Wildcard DNS for subdomains
+**Until then:** signup + billing works in mock mode (no Stripe redirect, gym provisioned instantly).
+
+### 2. Wildcard DNS for subdomains
 Currently `*.cruxgym.co.uk` doesn't point anywhere. Need:
 - Cloudflare: add `A` record `*` → `52.51.136.243` (proxied)
-- nginx: update `/etc/nginx/conf.d/cruxgym.conf` to handle any subdomain and proxy to the Express app on port 8080
+- nginx: two server blocks — one for marketing site (apex), one for app (subdomains)
 
-nginx config change needed:
 ```nginx
+# Subdomains → Express app
 server {
     listen 80;
-    server_name cruxgym.co.uk www.cruxgym.co.uk *.cruxgym.co.uk;
-    # ... proxy to port 8080 for *.cruxgym.co.uk
-    # ... serve /var/www/cruxgym for cruxgym.co.uk (marketing site)
+    server_name ~^(?<subdomain>.+)\.cruxgym\.co\.uk$;
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+# Apex → marketing site
+server {
+    listen 80;
+    server_name cruxgym.co.uk www.cruxgym.co.uk;
+    root /var/www/cruxgym;
+    index index.html;
+    location / { try_files $uri $uri/ =404; }
+    # Signup page proxied to app
+    location /signup { proxy_pass http://127.0.0.1:8080; proxy_set_header Host $host; }
 }
 ```
-Actually needs two server blocks — one for the marketing site (apex domain), one for subdomains (app).
 
-### 4. JWT_SECRET in production
-Currently using an insecure fallback. Set `JWT_SECRET` in `/etc/crux.env` and load it in server.js.
+### 3. JWT_SECRET in production
+Set `JWT_SECRET` in `/etc/crux.env`. Also ensure `ADMIN_TOKEN` is a real secret, not the placeholder.
 
-### 5. Production process management
-The app currently runs as a background process. Should be a systemd service like the form handler:
-`/etc/systemd/system/crux-app.service`
+### 4. Deploy systemd service
+```bash
+sudo cp crux-app.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable crux-app
+sudo systemctl start crux-app
+sudo systemctl status crux-app
+```
 
-### 6. Self-serve signup flow (future)
-Currently gyms are provisioned manually via the admin panel. Eventually: a signup page at cruxgym.co.uk where gym owners can sign up, pay via Stripe, and get their instance automatically provisioned.
-
-### 7. Data export for GDPR compliance
-Settings → General should have a "Export all data" button that generates a ZIP of member data, transactions, waivers, etc. This was mentioned in the website FAQs.
-
-### 8. Logo upload
-Settings → General should allow uploading a gym logo that appears in the sidebar and on emails.
+### 5. Test the full end-to-end flow
+1. Visit `cruxgym.co.uk/signup` (or `localhost:PORT/signup` locally)
+2. Fill in gym details → sign up (mock mode skips Stripe)
+3. Go to `gymid.cruxgym.co.uk` → complete onboarding wizard
+4. Set up staff, pass types, products
+5. Test member registration + waiver + check-in + POS
+6. Once Stripe keys are live: test billing upgrade + portal
 
 ---
 
@@ -221,6 +237,9 @@ Separate from the app. Lives at `/home/ec2-user/.openclaw/workspace/crux-website
 ## Useful Commands
 
 ```bash
+# Self-serve signup (test in browser)
+open http://localhost:8080/signup
+
 # Check app server status
 curl http://localhost:8080/api/gym-info
 

@@ -104,32 +104,108 @@ function getRoleBadgeHTML(role, size = 'sm') {
 // PIN Challenge System (per-action auth)
 // ============================================================
 
-// No persistent login. Every action that needs staff auth triggers a PIN challenge.
-// The PIN identifies the staff member and checks if they have the required permission.
+// ── Staff Session ─────────────────────────────────────────────────────────
+// Staff log in once with their PIN. Session stored in localStorage (12h expiry).
+// requirePin() skips the modal entirely when already logged in.
 
-window.currentStaff = null; // Only set temporarily during specific flows (e.g., POS operator)
+window.currentStaff = null;
 let _challengePinValue = '';
 let _challengeCallback = null;
 let _challengePermission = null;
 
+function getSession() {
+  try { return JSON.parse(localStorage.getItem('crux_staff_session') || 'null'); } catch { return null; }
+}
+
+function saveSession(staff) {
+  localStorage.setItem('crux_staff_session', JSON.stringify({ ...staff, savedAt: Date.now() }));
+  window.currentStaff = staff;
+  renderStaffWidget();
+}
+
+function clearSession() {
+  localStorage.removeItem('crux_staff_session');
+  window.currentStaff = null;
+  renderStaffWidget();
+}
+
+function restoreSession() {
+  const s = getSession();
+  if (!s) { renderStaffWidget(); return; }
+  if (s.savedAt && Date.now() - s.savedAt > 12 * 60 * 60 * 1000) { clearSession(); return; }
+  window.currentStaff = s;
+  renderStaffWidget();
+}
+
+function hasPermission(staff, permission) {
+  if (!staff) return false;
+  if (staff.role === 'owner' || staff.role === 'tech_lead') return true;
+  return !!(staff.permissions && staff.permissions[permission]);
+}
+
+function logout() {
+  clearSession();
+  showToast('Signed out', 'success');
+  setTimeout(() => location.reload(), 600);
+}
+
+function renderStaffWidget() {
+  const el = document.getElementById('staff-session-widget');
+  if (!el) return;
+  if (window.currentStaff) {
+    const s = window.currentStaff;
+    const initials = ((s.first_name?.[0] || '') + (s.last_name?.[0] || '')).toUpperCase();
+    el.innerHTML = `
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">${initials}</div>
+        <div class="flex-1 min-w-0">
+          <p class="text-white text-xs font-medium truncate">${s.first_name} ${s.last_name}</p>
+          <p class="text-slate-400 text-[11px] truncate">${getRoleDisplayName(s.role)}</p>
+        </div>
+        <button onclick="logout()" title="Sign out" class="p-1.5 rounded-lg hover:bg-slate-600 transition flex-shrink-0">
+          <svg class="w-4 h-4 text-slate-400 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+          </svg>
+        </button>
+      </div>`;
+  } else {
+    el.innerHTML = `
+      <button onclick="showLoginModal()" class="flex items-center gap-2 text-slate-400 hover:text-white transition text-xs w-full py-1">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        Sign in
+      </button>`;
+  }
+}
+
+function showLoginModal() {
+  requirePin(null, () => {});
+}
+
 /**
- * Show PIN challenge modal. Calls callback(staff) on success.
- * @param {string} permission - Required permission (e.g., 'pos', 'analytics', 'members_edit')
- * @param {function} callback - Called with staff object on successful auth
- * @param {string} [title] - Optional custom title
- * @param {string} [desc] - Optional description text
+ * requirePin — gate a permission-protected action.
+ * If already logged in with correct permission: runs callback immediately.
+ * If not logged in: shows PIN login modal.
  */
 function requirePin(permission, callback, title, desc) {
+  if (window.currentStaff) {
+    if (!permission || hasPermission(window.currentStaff, permission)) {
+      if (callback) callback(window.currentStaff);
+    } else {
+      showToast(`${window.currentStaff.first_name} doesn't have permission for this`, 'error');
+    }
+    return;
+  }
+
+  // Not logged in — show PIN modal as login screen
   _challengePinValue = '';
   _challengeCallback = callback;
   _challengePermission = permission;
 
-  document.getElementById('pin-challenge-title').textContent = title || 'Enter Staff PIN';
-  document.getElementById('pin-challenge-desc').textContent = desc || '';
+  document.getElementById('pin-challenge-title').textContent = 'Sign in';
+  document.getElementById('pin-challenge-desc').textContent = (title && title !== 'Enter Staff PIN' && title !== 'Staff PIN') ? title : 'Enter your PIN to continue';
   document.getElementById('challenge-pin-error').textContent = '';
   document.getElementById('challenge-pin-staff').innerHTML = '';
   updateChallengeDots();
-
   document.getElementById('pin-challenge-overlay').style.display = 'flex';
 }
 
@@ -176,13 +252,15 @@ async function attemptPinChallenge(pin) {
       return;
     }
 
-    // Check permission
-    const hasPerm = result.role === 'owner' || result.role === 'tech_lead' || (result.permissions && result.permissions[_challengePermission]);
-    if (!hasPerm) {
-      showPinError('Access denied - insufficient permissions');
-      // Still show who it was
-      document.getElementById('challenge-pin-staff').innerHTML =
-        `<span class="text-slate-400 text-xs">${result.first_name} ${result.last_name} (${getRoleDisplayName(result.role)})</span>`;
+    // Valid PIN — log them in regardless
+    saveSession(result);
+
+    // Now check if they have the required permission for this specific action
+    if (_challengePermission && !hasPermission(result, _challengePermission)) {
+      document.getElementById('pin-challenge-overlay').style.display = 'none';
+      showToast(`${result.first_name} doesn't have permission for this`, 'error');
+      _challengeCallback = null;
+      _challengePermission = null;
       return;
     }
 
@@ -287,8 +365,14 @@ async function handleFirstRunSetup() {
   try {
     await api('POST', '/api/staff', { first_name: firstName, last_name: lastName, email, pin, role: 'owner' });
     document.getElementById('first-run-overlay').style.display = 'none';
-    showToast(`Owner account created for ${firstName}. PIN: ${pin}`, 'success');
-    navigateTo('dashboard');
+    // If we came from the signup flow, show the success modal instead of just the dashboard
+    if (sessionStorage.getItem('crux_signup_flow')) {
+      const successModal = document.getElementById('signup-success-modal');
+      if (successModal) successModal.style.display = 'flex';
+    } else {
+      showToast(`Owner account created for ${firstName}. PIN: ${pin}`, 'success');
+      navigateTo('dashboard');
+    }
   } catch (err) {
     errEl.textContent = err.message || 'Failed to create account';
     errEl.style.display = 'block';
@@ -5521,6 +5605,45 @@ async function loadGeneralSettings() {
             <button type="submit" class="px-6 py-2.5 bg-[#1E3A5F] hover:bg-[#2A4D7A] text-white font-medium rounded-lg transition text-sm">Save Changes</button>
           </div>
         </form>
+
+        <!-- Logo Upload (outside form — handled separately) -->
+        <div class="bg-white border border-gray-200 rounded-xl p-5 max-w-2xl mt-4">
+          <h4 class="font-medium text-gray-900 mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            Gym Logo
+          </h4>
+          <div class="flex items-center gap-4">
+            <div id="logo-preview" class="w-16 h-16 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden bg-gray-50">
+              ${settings.gym_logo
+                ? `<img src="${settings.gym_logo}" class="w-full h-full object-contain p-1" alt="Gym logo">`
+                : `<svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`}
+            </div>
+            <div class="flex-1">
+              <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Upload Logo</label>
+              <input type="file" id="logo-file-input" accept="image/*" onchange="uploadGymLogo(this)" class="text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 cursor-pointer">
+              <p class="text-xs text-gray-400 mt-1">PNG, JPG or SVG. Appears in the sidebar and on emails.</p>
+              ${settings.gym_logo ? `<button onclick="removeGymLogo()" class="text-xs text-red-500 hover:text-red-700 mt-1">Remove logo</button>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- Data Export -->
+        <div class="bg-white border border-gray-200 rounded-xl p-5 max-w-2xl mt-4">
+          <h4 class="font-medium text-gray-900 mb-1 flex items-center gap-2">
+            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Data Export
+          </h4>
+          <p class="text-xs text-gray-500 mb-3">Download a complete export of all your gym data (members, transactions, waivers, etc.) for GDPR compliance or backup purposes.</p>
+          <div class="flex gap-3 flex-wrap">
+            <a href="/api/export/gdpr" download class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition text-sm">
+              Export All Data (JSON)
+            </a>
+            <a href="/api/export/members.csv" download class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition text-sm">
+              Export Members (CSV)
+            </a>
+          </div>
+        </div>
+
       </div>
     `;
   } catch (err) {
@@ -5548,6 +5671,42 @@ async function saveGeneralSettings(e) {
     showToast('Settings saved', 'success');
   } catch (err) {
     showToast('Error saving settings: ' + err.message, 'error');
+  }
+}
+
+async function uploadGymLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 500 * 1024) {
+    showToast('Logo must be under 500 KB', 'error');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const base64 = e.target.result;
+    try {
+      await api('PUT', '/api/settings/gym_logo', { value: base64 });
+      document.getElementById('logo-preview').innerHTML = `<img src="${base64}" class="w-full h-full object-contain p-1" alt="Gym logo">`;
+      // Update sidebar logo if present
+      const sidebarLogo = document.getElementById('sidebar-logo-img');
+      if (sidebarLogo) { sidebarLogo.src = base64; sidebarLogo.style.display = ''; }
+      showToast('Logo updated', 'success');
+    } catch (err) {
+      showToast('Error uploading logo: ' + err.message, 'error');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function removeGymLogo() {
+  try {
+    await api('PUT', '/api/settings/gym_logo', { value: '' });
+    document.getElementById('logo-preview').innerHTML = `<svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
+    const sidebarLogo = document.getElementById('sidebar-logo-img');
+    if (sidebarLogo) sidebarLogo.style.display = 'none';
+    showToast('Logo removed', 'success');
+  } catch (err) {
+    showToast('Error removing logo: ' + err.message, 'error');
   }
 }
 
@@ -5856,13 +6015,20 @@ window.gymName = 'Crux';
     if (settings && settings.gym_name) {
       window.gymName = settings.gym_name;
       const sidebarFooter = document.getElementById('sidebar-gym-footer');
-      if (sidebarFooter) sidebarFooter.textContent = settings.gym_name;
+      if (sidebarFooter) {
+        if (settings.gym_logo) {
+          sidebarFooter.innerHTML = `<img id="sidebar-logo-img" src="${settings.gym_logo}" style="max-height:32px;max-width:120px;object-fit:contain;" alt="${settings.gym_name}">`;
+        } else {
+          sidebarFooter.textContent = settings.gym_name;
+        }
+      }
       document.title = settings.gym_name + ' · Crux';
     }
   } catch (e) { /* settings not critical for startup */ }
 })();
 
 // Init — no login required, check first run then load dashboard
+restoreSession();
 checkFirstRun();
 loadPage('dashboard');
 
@@ -5996,3 +6162,34 @@ function closeWelcomeModal() {
 
 // Load onboarding status on startup (non-blocking)
 loadOnboardingStatus();
+
+// ── Post-signup success detection ─────────────────────────────────────────
+// When Stripe redirects back with ?signup=success, show the welcome modal.
+
+function closeSignupSuccessModal() {
+  const el = document.getElementById('signup-success-modal');
+  if (el) el.style.display = 'none';
+  sessionStorage.removeItem('crux_signup_flow');
+  // Go to settings — will prompt for their newly created PIN
+  navigateToSettings('general');
+}
+
+(function checkSignupSuccess() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('signup') === 'success') {
+    // Clean the URL so refresh doesn't re-trigger
+    window.history.replaceState({}, '', window.location.pathname);
+    // Store flag so first-run flow can hand off to success modal
+    sessionStorage.setItem('crux_signup_flow', '1');
+    // Show modal after a short delay — but only if first-run overlay is NOT showing
+    // (if it is showing, handleFirstRunSetup will show the modal after account creation)
+    setTimeout(() => {
+      const firstRun = document.getElementById('first-run-overlay');
+      const isFirstRunVisible = firstRun && firstRun.style.display !== 'none';
+      if (!isFirstRunVisible) {
+        const el = document.getElementById('signup-success-modal');
+        if (el) el.style.display = 'flex';
+      }
+    }, 600);
+  }
+})();

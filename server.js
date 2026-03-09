@@ -2,6 +2,7 @@
  * Crux — Express Web Server
  */
 
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const helmet = require('helmet');
@@ -79,6 +80,12 @@ app.get('/admin', (req, res) => {
 });
 app.use('/admin', requireAdmin, require('./src/routes/admin'));
 
+// ── Self-serve signup (before gym context — no gym yet) ───────────────────
+app.get('/signup', (req, res) => {
+  res.sendFile(path.join(__dirname, 'src', 'public', 'signup.html'));
+});
+app.use('/api/signup', require('./src/routes/signup'));
+
 // ── Gym context middleware ─────────────────────────────────────────────────
 // Resolves the active gym_id from the request subdomain and threads it
 // through the entire async call chain via AsyncLocalStorage.
@@ -130,6 +137,19 @@ app.use((req, res, next) => {
   gymContext.run({ gymId }, next);
 });
 
+// ── Billing gate (applied to all /api routes except auth) ─────────────────
+const requireBilling = require('./src/middleware/requireBilling');
+app.use('/api', (req, res, next) => {
+  // Auth routes and gym-info must always be accessible
+  if (
+    req.path.startsWith('/staff/auth') ||
+    req.path.startsWith('/climber/auth') ||
+    req.path.startsWith('/gym-info') ||
+    req.path.startsWith('/signup')
+  ) return next();
+  requireBilling(req, res, next);
+});
+
 // ── API Routes ─────────────────────────────────────────────────────────────
 
 app.use('/api/members', require('./src/routes/members'));
@@ -147,6 +167,7 @@ app.use('/api/email', require('./src/routes/email'));
 app.use('/api/settings', require('./src/routes/settings'));
 app.use('/api/onboarding', require('./src/routes/onboarding'));
 app.use('/api/stats', require('./src/routes/stats'));
+app.use('/api/export', require('./src/routes/export'));
 app.use('/api', require('./src/routes/register'));
 app.use('/api/dojo', require('./src/routes/dojo'));
 

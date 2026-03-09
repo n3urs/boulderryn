@@ -1,0 +1,18 @@
+[Unit]
+Description=Crux Gym Management App
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/.openclaw/workspace/boulderryn-project
+EnvironmentFile=/etc/crux.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=crux-app
+
+[Install]
+WantedBy=multi-user.target

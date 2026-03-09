@@ -87,15 +87,10 @@ function provisionGym(gymId, gymName = '') {
       console.log('  Schema already applied — skipping.');
     }
 
-    // Set gym_name in settings
+    // Set gym_name in settings (always overwrite the schema default "My Gym" if a name was provided)
     if (gymName) {
-      const existing = db.prepare("SELECT value FROM settings WHERE key = 'gym_name'").get();
-      if (!existing || !existing.value) {
-        db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('gym_name', ?)").run(gymName);
-        console.log(`  Set gym_name = "${gymName}"`);
-      } else {
-        console.log(`  gym_name already set to "${existing.value}" — skipping.`);
-      }
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('gym_name', ?)").run(gymName);
+      console.log(`  Set gym_name = "${gymName}"`);
     }
 
     db.close();
