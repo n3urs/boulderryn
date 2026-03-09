@@ -55,8 +55,7 @@ router.post('/auth/request', (req, res) => {
   const db = getDb();
   const member = db.prepare('SELECT id, first_name, last_name, email FROM members WHERE LOWER(email) = LOWER(?)').get(email.trim());
 
-  // Always respond OK — don't reveal if email exists
-  if (!member) return res.json({ ok: true });
+  if (!member) return res.status(404).json({ error: 'No account found with that email. Contact the gym to get set up.' });
 
   // Generate 6-digit OTP
   const token = String(Math.floor(100000 + Math.random() * 900000));
