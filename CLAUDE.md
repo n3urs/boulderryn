@@ -152,6 +152,42 @@ node scripts/provision-gym.js mygym "My Gym Name"
 
 ---
 
+## Self-Serve Signup & Auth — How It Works
+
+This feature is now built. Here's how the flow works:
+
+### Domain structure
+- `cruxgym.co.uk` — marketing site + "Sign Up" / "Log In" links
+- `cruxgym.co.uk/signup` — signup page (backend route + HTML)
+- `cruxgym.co.uk/login` — login page for returning users
+- `gymname.cruxgym.co.uk` — individual gym instance
+
+### Signup flow (`/signup`)
+Multi-step:
+1. **Personal details** — name, email, password (gym owner account)
+2. **Gym details** — gym name, subdomain (auto-generated from gym name)
+3. **Stripe** — card details, 14-day trial (redirects to Stripe Checkout)
+4. On completion: gym provisioned, owner account created, welcome email sent, redirect to subdomain with welcome modal
+
+### Login flow (`/login`)
+- Email + password
+- Redirect to gymname.cruxgym.co.uk on success
+
+### Staff accounts
+- All staff get email accounts
+- Invite flow: owner enters email in Settings → Staff → invite email sent → staff sets password via link
+- **Desk login:** PIN only (quick actions, each staff has unique PIN for audit)
+- **Web/remote login:** email + password
+
+### Role-based permissions
+**Full access** (Owner, Tech Lead, Duty Manager): everything
+**Desk-only** (Centre Assistant, Route Setter): Visitors, Members, POS, Events (view only), Routes (Route Setter only)
+**Restricted:** Analytics, Settings, Billing, Staff management (admin/manager only)
+
+Sidebar only shows permitted nav items based on role.
+
+---
+
 ## What Still Needs Doing (Priority Order)
 
 ### 1. Real Stripe keys (BLOCKER for end-to-end testing)
