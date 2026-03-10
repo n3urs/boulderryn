@@ -46,6 +46,21 @@ function requireMemberAuth(req, res, next) {
   }
 }
 
+// Accepts either a member JWT (Bearer) or a staff x-staff-id header
+function requireMemberOrStaffAuth(req, res, next) {
+  if (req.headers['x-staff-id']) return next();
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorised' });
+  }
+  try {
+    req.member = jwt.verify(auth.slice(7), JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: 'Session expired. Please log in again.' });
+  }
+}
+
 // ── POST /me/auth/request ─────────────────────────────────────────────────
 
 router.post('/auth/request', (req, res) => {
@@ -212,7 +227,7 @@ router.get('/logbook', requireMemberAuth, (req, res) => {
 
 // ── GET /me/noticeboard ───────────────────────────────────────────────────
 
-router.get('/noticeboard', requireMemberAuth, (req, res) => {
+router.get('/noticeboard', requireMemberOrStaffAuth, (req, res) => {
   const db = getDb();
   const posts = db.prepare(`
     SELECT n.*, s.first_name || ' ' || s.last_name as posted_by

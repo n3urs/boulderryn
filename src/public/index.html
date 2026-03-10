@@ -213,7 +213,10 @@
             <h2 style="font-size:1.25rem;font-weight:700;color:#111827;margin:0">Welcome to Crux</h2>
             <p id="wizard-step-label" style="font-size:0.875rem;color:#6B7280;margin:0.25rem 0 0"></p>
           </div>
-          <span style="font-size:0.75rem;font-weight:600;color:#3B82F6;background:#EFF6FF;padding:0.25rem 0.75rem;border-radius:9999px">Setup Wizard</span>
+          <div style="display:flex;align-items:center;gap:0.75rem">
+            <span style="font-size:0.75rem;font-weight:600;color:#3B82F6;background:#EFF6FF;padding:0.25rem 0.75rem;border-radius:9999px">Setup Wizard</span>
+            <button onclick="dismissSetupWizard()" title="Dismiss for now" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:1.25rem;line-height:1;padding:0.25rem" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#9CA3AF'">✕</button>
+          </div>
         </div>
         <!-- Progress bar -->
         <div style="background:#F3F4F6;border-radius:9999px;height:6px;overflow:hidden">

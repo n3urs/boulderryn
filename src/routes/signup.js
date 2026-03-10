@@ -157,6 +157,8 @@ router.post('/create', async (req, res) => {
       customer: customerId,
       payment_method_types: ['card'],
       mode: 'subscription',
+      currency: 'gbp',
+      locale: 'en-GB',
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl,
       cancel_url: cancelUrl,

@@ -510,7 +510,8 @@ async function checkSetupWizard() {
   if (!window.currentStaff) return;
   const role = window.currentStaff.role;
   if (role !== 'owner' && role !== 'tech_lead') return;
-  // Don't show if other overlays are visible
+  // Don't show if dismissed this session or other overlays visible
+  if (localStorage.getItem('wizard_dismissed') === '1') return;
   const firstRun = document.getElementById('first-run-overlay');
   if (firstRun && firstRun.style.display === 'flex') return;
   try {
@@ -531,6 +532,19 @@ function showSetupWizard() {
   el.style.display = 'flex';
   renderWizardStep();
 }
+
+function dismissSetupWizard() {
+  localStorage.setItem('wizard_dismissed', '1');
+  document.getElementById('setup-wizard').style.display = 'none';
+}
+
+// Escape key closes wizard
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const wizard = document.getElementById('setup-wizard');
+    if (wizard && wizard.style.display === 'flex') dismissSetupWizard();
+  }
+});
 
 async function wizardNext() {
   const ok = await saveWizardStep(_wizardStep);
@@ -1339,6 +1353,12 @@ function navigateTo(pageName) {
 
   // Pages that require PIN to VIEW/ENTER
   if (pinRequired) {
+    // If already logged in via web (password), skip PIN and use current staff
+    if (window.currentStaff) {
+      posOperator = window.currentStaff;
+      doNavigate(pageName);
+      return;
+    }
     const pinTitle = navLink?.dataset.pinTitle || 'Enter PIN';
     const pinDesc = navLink?.dataset.pinDesc || '';
     requirePin(pinRequired, (staff) => {
