@@ -802,6 +802,7 @@ function renderWizardStep4() {
         <div class="flex items-center gap-2 mb-3">
           <button id="map-draw-btn" onclick="startDrawingWall()" class="px-4 py-2 bg-[#1E3A5F] text-white text-sm font-semibold rounded-lg hover:bg-[#2A4D7A] transition">✏️ Draw Wall</button>
           <button onclick="cancelDrawing()" id="map-cancel-btn" class="hidden px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200 transition">Cancel</button>
+          <button onclick="undoLastPoint()" id="map-undo-btn" class="hidden px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200 transition">↩ Undo</button>
           <span id="map-drawing-hint" class="text-sm text-amber-600 font-medium hidden">Click to add points · Double-click to finish</span>
         </div>
         <div class="border-2 border-gray-200 rounded-xl overflow-hidden" id="map-canvas-wrap">
@@ -881,6 +882,7 @@ function handleMapDblClick(e) {
   _mapState.isDrawing = false;
   document.getElementById('map-draw-btn').classList.remove('hidden');
   document.getElementById('map-cancel-btn').classList.add('hidden');
+  document.getElementById('map-undo-btn').classList.add('hidden');
   document.getElementById('map-drawing-hint').classList.add('hidden');
   const panel = document.getElementById('wiz-name-panel');
   panel.classList.remove('hidden');
@@ -903,6 +905,7 @@ function startDrawingWall() {
   _mapState.cursorPos = null;
   document.getElementById('map-draw-btn').classList.add('hidden');
   document.getElementById('map-cancel-btn').classList.remove('hidden');
+  document.getElementById('map-undo-btn').classList.remove('hidden');
   document.getElementById('map-drawing-hint').classList.remove('hidden');
   document.getElementById('wiz-name-panel').classList.add('hidden');
 }
@@ -913,7 +916,14 @@ function cancelDrawing() {
   _mapState.cursorPos = null;
   document.getElementById('map-draw-btn').classList.remove('hidden');
   document.getElementById('map-cancel-btn').classList.add('hidden');
+  document.getElementById('map-undo-btn').classList.add('hidden');
   document.getElementById('map-drawing-hint').classList.add('hidden');
+  renderDrawingLayer();
+}
+
+function undoLastPoint() {
+  if (!_mapState.isDrawing || _mapState.drawingPoints.length === 0) return;
+  _mapState.drawingPoints.pop();
   renderDrawingLayer();
 }
 
@@ -6957,7 +6967,7 @@ async function showDrawWallModal(existingWallId = null) {
           `).join('')}
         </div>
       </div>
-      <p class="text-xs text-gray-500 mb-2">Click to place points · Double-click to finish · <button onclick="clearSettingsWallDraw()" class="text-blue-500 hover:underline">Clear</button></p>
+      <p class="text-xs text-gray-500 mb-2">Click to place points · Double-click to finish · <button onclick="settingsWallUndo()" class="text-blue-500 hover:underline">↩ Undo</button> · <button onclick="clearSettingsWallDraw()" class="text-blue-500 hover:underline">Clear</button></p>
       <svg id="sw-map-svg" viewBox="0 0 800 500" style="width:100%;height:260px;background:#F8FAFC;border:1px solid #E5E7EB;border-radius:0.5rem;cursor:crosshair"
            onclick="settingsMapClick(event)" ondblclick="settingsMapDblClick(event)">
         <defs><pattern id="swgrid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E5E7EB" stroke-width="0.5"/></pattern></defs>
@@ -7032,6 +7042,12 @@ function selectSettingsWallColour(c) {
 
 function clearSettingsWallDraw() {
   _settingsWallDrawState.points = [];
+  renderSettingsDrawing();
+}
+
+function settingsWallUndo() {
+  if (_settingsWallDrawState.points.length === 0) return;
+  _settingsWallDrawState.points.pop();
   renderSettingsDrawing();
 }
 
