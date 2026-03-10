@@ -2292,10 +2292,9 @@ async function runMemberImport() {
       resultEl.innerHTML = html;
     }
 
-    showToast(`Imported ${data.imported} members`, 'success');
-
-    // Refresh the members list in the background
     await refreshMembersList();
+    showToast(`Imported ${data.imported} members`, 'success');
+    setTimeout(() => closeModal(), 1500);
 
   } catch (err) {
     if (resultEl) {
