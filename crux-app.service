@@ -7,6 +7,7 @@ Type=simple
 User=ec2-user
 WorkingDirectory=/home/ec2-user/.openclaw/workspace/boulderryn-project
 EnvironmentFile=/etc/crux.env
+ExecStartPre=/bin/bash -c 'fuser -k 8080/tcp || true'
 ExecStart=/usr/bin/node server.js
 Restart=on-failure
 RestartSec=5
