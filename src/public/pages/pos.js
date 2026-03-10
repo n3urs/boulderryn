@@ -163,7 +163,7 @@ async function posLoadProducts() {
   const categoriesInner = document.getElementById('pos-categories-inner');
 
   // Prepend a Passes category from pass_types table
-  const activePasses = (passTypes || []).filter(pt => pt.is_active);
+  const activePasses = (passTypes || []).filter(pt => pt.is_active && pt.category !== 'staff');
   if (activePasses.length > 0) {
     grouped.unshift({
       id: 'cat_passes',
