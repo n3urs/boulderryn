@@ -4,6 +4,96 @@ Read this first. This is the full context for continuing work on the Crux gym ma
 
 ---
 
+## NEXT UP — Immediate Action List
+
+Work through these in order. Tick them off as you go.
+
+### 1. Fix port 8080 systemd conflict (5 min)
+- The `crux-app.service` sometimes fails to start because port 8080 is already in use
+- Fix: check what's on 8080 (`lsof -i :8080`), kill stale processes, add `ExecStartPre=/bin/bash -c 'fuser -k 8080/tcp || true'` to the systemd service file
+- Verify: `sudo systemctl restart crux-app && sudo systemctl status crux-app`
+
+### 2. End-to-end test — full happy path
+Work through the entire flow as a real user would. Fix anything that breaks.
+
+**Signup → setup:**
+- [ ] Go to `cruxgym.co.uk/signup` — loads, form works
+- [ ] Complete signup with test details, Stripe test card `4242 4242 4242 4242`
+- [ ] Gym provisioned, welcome email arrives, redirect to subdomain works
+- [ ] Complete the 5-step setup wizard end-to-end
+
+**Core gym app:**
+- [ ] Add a staff member (Settings → Staff), send invite, accept invite
+- [ ] Register a member via `/register` (full waiver + induction video)
+- [ ] Check in that member (QR scan + manual search)
+- [ ] Complete a POS transaction, check receipt email
+- [ ] View Analytics dashboard — data showing correctly
+
+**Billing:**
+- [ ] Settings → Billing → "Manage Subscription" → opens Stripe portal
+- [ ] Manually expire trial in DB → billing gate activates
+- [ ] Reactivate → gate clears
+
+**Emails:**
+- [ ] Welcome email — arrives, links work, links to correct subdomain
+- [ ] Member registration confirmation — arrives, correct QR/pass details
+- [ ] Staff invite email — arrives, link works
+
+### 3. Member Portal — build it (Priority 1 — biggest missing feature)
+Full spec in the "Member Portal" section below. Not started. Key deliverables:
+- OTP/magic link auth (`/me/auth/request`, `/me/auth/verify`)
+- Member home: QR code fullscreen, pass status + expiry
+- Gym map + routes (read-only)
+- "Mark as sent" logbook per member
+- Noticeboard (read for members, write for managers)
+- PWA: installable, service worker for offline cache
+- DB tables needed: `member_sends`, `noticeboard`, `member_sessions`
+
+### 4. Integration — link all the parts (Priority 2)
+- [ ] `cruxgym.co.uk` nav: "Sign Up" → `/signup`, "Log In" → `/login` (already done per snapshot — confirm live)
+- [ ] `/login` on root domain: look up email → redirect to `gymname.cruxgym.co.uk` + auto-login
+- [ ] Staff app dashboard: "Member Registration Link" widget — shows `/register` URL + printable QR
+- [ ] Welcome email + registration confirmation: include `/me` member portal link
+- [ ] Settle super-admin URL (`cruxgym.co.uk/admin` vs `admin.cruxgym.co.uk`), document it
+
+### 5. Email sequence — automated onboarding (Priority 4)
+Start with the high-value ones:
+- [ ] Day 13: "Your trial ends tomorrow" — most important, drives conversion
+- [ ] Day 14: "Trial expired" — Stripe portal reactivation link
+- [ ] Day 3: "Getting started" tips
+- [ ] Day 7: "One week in" — setup checklist with links
+- Implementation: scheduled check on server startup querying `platform.db` for gyms near/past trial end
+
+### 6. Super-admin improvements (Priority 3)
+- [ ] "Open Gym" impersonate button — one-time token → redirect to gym as Owner
+- [ ] Revenue dashboard: MRR, active/trialing/churned counts, trial-ending-soon list
+- [ ] Quick links: Stripe dashboard, cruxgym.co.uk, server logs, each gym's subdomain
+
+### 7. Production hardening (Priority 5)
+- [ ] Set real `JWT_SECRET` in `/etc/crux.env`
+- [ ] Set real `ADMIN_TOKEN` (not `admin_secret_placeholder`)
+- [ ] Rate limiting on `/me/auth/request`, `/signup`, `/login`
+- [ ] Confirm Cloudflare SSL mode is "Full" not "Flexible" for `*.cruxgym.co.uk`
+- [ ] Input validation on all public-facing routes
+- [ ] Rename `boulderryn-project/` → `crux/` and update GitHub remote
+
+### 8. Monitoring & backups (Priority 6)
+- [ ] UptimeRobot (free) on `cruxgym.co.uk` + EC2
+- [ ] Daily cron backup: `platform.db` + all `gym.db` files → S3 (eu-west-1), 30-day retention
+- [ ] `scripts/backup.sh` — write it, test it, add to cron
+
+### 9. Branded email templates (Priority 4)
+- [ ] Consistent HTML template: Crux logo, navy/white, footer with unsubscribe
+- [ ] Apply to: welcome, QR code, invite, receipt, sequence emails
+
+### 10. UX polish (Priority 7)
+- [ ] Custom 404 (nginx) + "Gym not found" page
+- [ ] Mobile audit: staff app on phone/tablet (POS + check-in focus)
+- [ ] "Print QR" button on member profile → printable A6 card
+- [ ] Loading spinners on all API calls
+
+---
+
 ## What Is Crux?
 
 Crux is a **multi-tenant SaaS platform** for climbing and bouldering gyms. Gyms pay a monthly subscription to access the platform. Each gym gets their own isolated subdomain (`gymname.cruxgym.co.uk`) and a completely separate SQLite database. There is no shared data between gyms.
