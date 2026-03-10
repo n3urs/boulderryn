@@ -156,8 +156,52 @@ const categoryColours = {
 };
 
 async function posLoadProducts() {
-  const grouped = await api('GET', '/api/products/grouped');
+  const [grouped, passTypes] = await Promise.all([
+    api('GET', '/api/products/grouped'),
+    api('GET', '/api/passes/types'),
+  ]);
   const categoriesInner = document.getElementById('pos-categories-inner');
+
+  // Prepend a Passes category from pass_types table
+  const activePasses = (passTypes || []).filter(pt => pt.is_active);
+  if (activePasses.length > 0) {
+    grouped.unshift({
+      id: 'cat_passes',
+      name: 'Passes',
+      icon: '🎫',
+      products: activePasses.map(pt => ({
+        id: 'pass:' + pt.id,
+        pass_type_id: pt.id,
+        name: pt.name,
+        price: pt.price_peak || pt.price_off_peak || 0,
+        price_off_peak: pt.price_off_peak,
+        is_pass_type: true,
+        stock_count: null,
+        stock_enforce_limit: 0,
+        product_code: null,
+      })),
+    });
+  }
+
+  // Add Hire category if shoe rental price is set
+  const shoePrice = parseFloat(window._gymSettings?.shoe_rental_price || '0');
+  if (shoePrice > 0) {
+    const hireGroup = grouped.find(g => g.name.toLowerCase() === 'hire');
+    const shoeItem = {
+      id: 'hire:shoes',
+      name: 'Shoe Hire',
+      price: shoePrice,
+      is_hire: true,
+      stock_count: null,
+      stock_enforce_limit: 0,
+      product_code: null,
+    };
+    if (hireGroup) {
+      hireGroup.products.unshift(shoeItem);
+    } else {
+      grouped.push({ id: 'cat_hire', name: 'Hire', icon: '👟', products: [shoeItem] });
+    }
+  }
 
   if (grouped.length === 0) {
     categoriesInner.innerHTML = '<p class="text-gray-400 text-center col-span-full py-8">No products yet</p>';
@@ -169,7 +213,7 @@ async function posLoadProducts() {
   categoriesInner.innerHTML = grouped.map(g => {
     const gradient = categoryColours[g.id] || 'from-gray-500 to-gray-600';
     return `
-      <button onclick="posSelectCategory('${g.id}', this)" 
+      <button onclick="posSelectCategory('${g.id}', this)"
               class="pos-category-btn bg-gradient-to-br ${gradient} text-white rounded-xl p-3 text-left hover:shadow-lg hover:scale-[1.02] transition-all relative overflow-hidden"
               data-cat="${g.id}">
         <div class="text-2xl mb-1">${g.icon || '📦'}</div>
@@ -204,15 +248,18 @@ function posRenderProductGrid(categoryId) {
 
   gridEl.innerHTML = cat.products.map(p => {
     const outOfStock = p.stock_enforce_limit && p.stock_count !== null && p.stock_count <= 0;
+    const priceDisplay = p.is_pass_type && p.price_off_peak && p.price_off_peak !== p.price
+      ? `<span class="text-blue-700 font-bold text-lg">£${p.price.toFixed(2)}</span><span class="text-gray-400 text-xs block">Off-peak: £${p.price_off_peak.toFixed(2)}</span>`
+      : `<span class="text-blue-700 font-bold text-lg">£${p.price.toFixed(2)}</span>`;
     return `
-      <button onclick="posAddToCart('${p.id}')" 
-              class="pos-product-card bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition ${outOfStock ? 'opacity-40' : ''}" 
+      <button onclick="posAddToCart('${p.id}')"
+              class="pos-product-card bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition ${outOfStock ? 'opacity-40' : ''}"
               ${outOfStock ? 'disabled' : ''}>
         <div class="bg-blue-600 px-3 py-2">
           <span class="text-white text-sm font-bold leading-tight block truncate">${p.name}</span>
         </div>
         <div class="px-3 py-2">
-          <span class="text-blue-700 font-bold text-lg">£${p.price.toFixed(2)}</span>
+          ${priceDisplay}
           ${p.product_code ? `<span class="text-gray-400 text-xs block mt-0.5">${p.product_code}</span>` : ''}
           ${p.stock_count !== null ? `<span class="text-xs text-gray-400">${p.stock_count} in stock</span>` : ''}
         </div>
@@ -222,7 +269,63 @@ function posRenderProductGrid(categoryId) {
 }
 
 async function posAddToCart(productId) {
-  _doAddToCart(productId);
+  if (productId.startsWith('pass:')) {
+    posAddPassToCart(productId);
+  } else if (productId.startsWith('hire:')) {
+    posAddHireToCart(productId);
+  } else {
+    _doAddToCart(productId);
+  }
+}
+
+function posAddHireToCart(hireId) {
+  let hireProduct = null;
+  for (const cat of window._posProducts || []) {
+    hireProduct = cat.products.find(p => p.id === hireId);
+    if (hireProduct) break;
+  }
+  if (!hireProduct) return;
+
+  const existing = posCart.find(item => item.product_id === hireId);
+  if (existing) {
+    existing.quantity++;
+    existing.total_price = existing.quantity * existing.unit_price;
+  } else {
+    posCart.push({
+      product_id: hireId,
+      description: hireProduct.name,
+      unit_price: hireProduct.price,
+      quantity: 1,
+      total_price: hireProduct.price,
+      is_day_entry: false,
+      assigned_member: null,
+    });
+  }
+  posRenderCart();
+}
+
+function posAddPassToCart(passProductId) {
+  let passProduct = null;
+  for (const cat of window._posProducts || []) {
+    passProduct = cat.products.find(p => p.id === passProductId);
+    if (passProduct) break;
+  }
+  if (!passProduct) return;
+
+  posCart.push({
+    product_id: passProductId,
+    pass_type_id: passProduct.pass_type_id,
+    description: passProduct.name,
+    unit_price: passProduct.price,
+    quantity: 1,
+    total_price: passProduct.price,
+    is_pass_type: true,
+    is_day_entry: true,
+    assigned_member: posSelectedMember ? { ...posSelectedMember } : null,
+  });
+
+  posRenderCart();
+  if (posSelectedMember) posRenderMemberDisplay();
 }
 
 async function _doAddToCart(productId) {
@@ -633,17 +736,39 @@ async function posPayMethod(method) {
     let membershipPurchased = false;
 
     {
-      // Day Entry: issue pass per assigned member, auto check-in each
-      const dayEntryItems = savedCart.filter(item => posIsDayEntryProduct(item.description));
+      const now = new Date();
+      const hour = now.getHours();
+      const day = now.getDay();
+      const isWeekday = day >= 1 && day <= 5;
+      const isPeak = !isWeekday || hour < 10 || hour >= 16;
+
+      // Direct pass type items (from Passes category)
+      const passTypeItems = savedCart.filter(item => item.is_pass_type && item.pass_type_id);
+      for (const ptItem of passTypeItems) {
+        const targetMember = ptItem.assigned_member || savedMember;
+        if (!targetMember) continue;
+        try {
+          const p = await api('POST', '/api/passes/issue', {
+            memberId: targetMember.id,
+            passTypeId: ptItem.pass_type_id,
+            isPeak,
+            pricePaid: ptItem.unit_price,
+          });
+          if (!passIssued) passIssued = p;
+          if (savedAutoCheckin) {
+            try {
+              const ci = await api('POST', '/api/checkin/process', { memberId: targetMember.id, method: 'pos' });
+              if (ci.success) checkedIn = true;
+            } catch (e) {}
+          }
+        } catch (e) { console.warn('Pass issue failed:', e); }
+      }
+
+      // Day Entry products (matched by name — legacy path)
+      const dayEntryItems = savedCart.filter(item => !item.is_pass_type && posIsDayEntryProduct(item.description));
       if (dayEntryItems.length > 0) {
         try {
           const passTypes = await api('GET', '/api/passes/types');
-          const now = new Date();
-          const hour = now.getHours();
-          const day = now.getDay();
-          const isWeekday = day >= 1 && day <= 5;
-          const isPeak = !isWeekday || hour < 10 || hour >= 16;
-
           for (const deItem of dayEntryItems) {
             const targetMember = deItem.assigned_member || savedMember;
             if (!targetMember) continue;
@@ -656,7 +781,7 @@ async function posPayMethod(method) {
                 isPeak,
                 pricePaid: deItem.unit_price
               });
-              if (!passIssued) passIssued = p; // keep first for receipt display
+              if (!passIssued) passIssued = p;
             }
             if (savedAutoCheckin) {
               try {
@@ -763,6 +888,10 @@ function posShowReceipt(txn, items, member, paymentMethod, extras = {}) {
     <button onclick="posNewTx(); posRenderCart();" class="w-full mt-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition">
       New Transaction
     </button>
+    ${window._posReturnPage ? `
+    <button onclick="navigateTo(window._posReturnPage)" class="w-full mt-2 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition">
+      ← Back
+    </button>` : ''}
   `;
 
   // Update totals display

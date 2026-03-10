@@ -206,6 +206,87 @@ async function loadMap() {
   }
   renderMeMap();
   renderMeRouteList();
+  initMapPanZoom();
+}
+
+// ── Map pan/zoom ──────────────────────────────────────────────────────────────
+
+let _mapPZ = { scale: 1, tx: 0, ty: 0, dragging: false, lastX: 0, lastY: 0, pinchDist: 0 };
+
+function _applyMapTransform() {
+  const g = document.getElementById('me-map-transform');
+  if (g) g.setAttribute('transform', `translate(${_mapPZ.tx},${_mapPZ.ty}) scale(${_mapPZ.scale})`);
+}
+
+function initMapPanZoom() {
+  const svg = document.getElementById('map-svg');
+  if (!svg || svg._pzInit) return;
+  svg._pzInit = true;
+
+  // Mouse wheel zoom
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = svg.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) / rect.width * 800;
+    const my = (e.clientY - rect.top) / rect.height * 600;
+    const delta = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    const newScale = Math.min(5, Math.max(0.5, _mapPZ.scale * delta));
+    _mapPZ.tx = mx - (mx - _mapPZ.tx) * (newScale / _mapPZ.scale);
+    _mapPZ.ty = my - (my - _mapPZ.ty) * (newScale / _mapPZ.scale);
+    _mapPZ.scale = newScale;
+    _applyMapTransform();
+  }, { passive: false });
+
+  // Mouse drag
+  svg.addEventListener('mousedown', e => { _mapPZ.dragging = true; _mapPZ.lastX = e.clientX; _mapPZ.lastY = e.clientY; });
+  window.addEventListener('mousemove', e => {
+    if (!_mapPZ.dragging) return;
+    const rect = svg.getBoundingClientRect();
+    const scaleX = 800 / rect.width, scaleY = 600 / rect.height;
+    _mapPZ.tx += (e.clientX - _mapPZ.lastX) * scaleX;
+    _mapPZ.ty += (e.clientY - _mapPZ.lastY) * scaleY;
+    _mapPZ.lastX = e.clientX; _mapPZ.lastY = e.clientY;
+    _applyMapTransform();
+  });
+  window.addEventListener('mouseup', () => { _mapPZ.dragging = false; });
+
+  // Touch pinch-to-zoom + pan
+  svg.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      _mapPZ.pinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    } else if (e.touches.length === 1) {
+      _mapPZ.dragging = true;
+      _mapPZ.lastX = e.touches[0].clientX;
+      _mapPZ.lastY = e.touches[0].clientY;
+    }
+  }, { passive: true });
+
+  svg.addEventListener('touchmove', e => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      const rect = svg.getBoundingClientRect();
+      const cx = ((e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left) / rect.width * 800;
+      const cy = ((e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top) / rect.height * 600;
+      const delta = dist / (_mapPZ.pinchDist || dist);
+      const newScale = Math.min(5, Math.max(0.5, _mapPZ.scale * delta));
+      _mapPZ.tx = cx - (cx - _mapPZ.tx) * (newScale / _mapPZ.scale);
+      _mapPZ.ty = cy - (cy - _mapPZ.ty) * (newScale / _mapPZ.scale);
+      _mapPZ.scale = newScale;
+      _mapPZ.pinchDist = dist;
+      _applyMapTransform();
+    } else if (e.touches.length === 1 && _mapPZ.dragging) {
+      const rect = svg.getBoundingClientRect();
+      const scaleX = 800 / rect.width, scaleY = 600 / rect.height;
+      _mapPZ.tx += (e.touches[0].clientX - _mapPZ.lastX) * scaleX;
+      _mapPZ.ty += (e.touches[0].clientY - _mapPZ.lastY) * scaleY;
+      _mapPZ.lastX = e.touches[0].clientX;
+      _mapPZ.lastY = e.touches[0].clientY;
+      _applyMapTransform();
+    }
+  }, { passive: false });
+
+  svg.addEventListener('touchend', () => { _mapPZ.dragging = false; });
 }
 
 function renderMeMap() {
@@ -303,13 +384,46 @@ function setMeGradeFilter(grade) {
 
 async function loadLogbook() {
   const list = document.getElementById('logbook-list');
+  const chart = document.getElementById('logbook-chart');
   list.innerHTML = '<p class="text-gray-400 text-sm text-center py-6">Loading...</p>';
+  chart.innerHTML = '';
   try {
     const sends = await meApi('GET', '/logbook');
     if (!sends.length) {
       list.innerHTML = '<p class="text-gray-400 text-sm text-center py-6">No sends yet — mark climbs on the map!</p>';
+      chart.innerHTML = '';
       return;
     }
+
+    // Build grade counts
+    const gradeCounts = {};
+    sends.forEach(s => { gradeCounts[s.grade] = (gradeCounts[s.grade] || 0) + 1; });
+    const gradesPresent = GRADE_ORDER.filter(g => gradeCounts[g]);
+    const maxCount = Math.max(...gradesPresent.map(g => gradeCounts[g]), 1);
+
+    // Bar chart (SVG)
+    const barW = Math.max(24, Math.min(48, Math.floor(280 / gradesPresent.length)));
+    const chartH = 100;
+    const totalW = gradesPresent.length * (barW + 6);
+    const bars = gradesPresent.map((g, i) => {
+      const count = gradeCounts[g];
+      const barH = Math.round((count / maxCount) * chartH);
+      const x = i * (barW + 6);
+      return `
+        <rect x="${x}" y="${chartH - barH}" width="${barW}" height="${barH}" rx="4" fill="#1E3A5F" opacity="0.85"/>
+        <text x="${x + barW / 2}" y="${chartH + 12}" text-anchor="middle" font-size="9" fill="#6B7280">${g}</text>
+        <text x="${x + barW / 2}" y="${chartH - barH - 4}" text-anchor="middle" font-size="9" font-weight="700" fill="#1E3A5F">${count}</text>
+      `;
+    }).join('');
+
+    chart.innerHTML = `
+      <p class="text-xs font-semibold text-gray-500 mb-2">Sends by grade</p>
+      <svg viewBox="0 0 ${Math.max(totalW, 100)} ${chartH + 20}" style="width:100%;overflow:visible">
+        ${bars}
+      </svg>
+      <p class="text-xs text-gray-400 mt-1 text-right">${sends.length} total send${sends.length !== 1 ? 's' : ''}</p>
+    `;
+
     list.innerHTML = sends.map(s => {
       const fill = HOLD_COLOURS[s.colour] || '#6B7280';
       const textFill = ['Yellow','Mint','White'].includes(s.colour) ? '#1F2937' : '#fff';

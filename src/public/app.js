@@ -1151,7 +1151,9 @@ function renderMemberCard(m, options = {}) {
   const colour = nameToColour(m.first_name + m.last_name);
   const age = calculateAge(m.date_of_birth);
   const isUnder18 = age !== null && age < 18;
+  const regFee = parseFloat(window._gymSettings?.first_time_registration_fee || '3');
   const regPaid = m.registration_fee_paid === 1;
+  const showRegFee = regFee > 0;
   const name = `${m.first_name} ${m.last_name}`.toUpperCase();
 
   return `
@@ -1164,7 +1166,7 @@ function renderMemberCard(m, options = {}) {
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
           <span class="font-bold text-sm text-gray-900">${name}</span>
-          ${!regPaid ? '<span class="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" title="Registration fee not paid">!</span>' : '<span class="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-white text-xs flex-shrink-0"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></span>'}
+          ${showRegFee ? (!regPaid ? '<span class="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" title="Registration fee not paid">!</span>' : '<span class="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-white text-xs flex-shrink-0"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></span>') : ''}
         </div>
         <p class="text-xs text-gray-500 truncate">${m.email || 'No email'}</p>
         ${m.date_of_birth ? `
@@ -1382,6 +1384,11 @@ function navigateTo(pageName) {
 }
 
 function doNavigate(pageName) {
+  if (pageName === 'pos') {
+    window._posReturnPage = window._currentActivePage || null;
+  }
+  window._currentActivePage = pageName;
+
   pages.forEach(p => {
     const el = document.getElementById(`page-${p}`);
     if (el) el.classList.remove('active');
@@ -1565,7 +1572,15 @@ async function loadDashboardStats() {
 }
 
 async function loadValidationQueue() {
+  const regFee = parseFloat(window._gymSettings?.first_time_registration_fee || '3');
   try {
+    // If reg fee is disabled, hide the validation queue entirely
+    if (regFee <= 0) {
+      const container = document.getElementById('dashboard-validation-queue');
+      if (container) container.classList.add('hidden');
+      return;
+    }
+
     const result = await api('GET', '/api/members/list?filter=reg_due&perPage=20');
     const members = result.members || [];
     const container = document.getElementById('dashboard-validation-queue');
@@ -1577,6 +1592,7 @@ async function loadValidationQueue() {
       return;
     }
 
+    const sym = window._gymSettings?.currency_symbol || '£';
     container.classList.remove('hidden');
     badge.textContent = members.length;
     list.innerHTML = members.map(m => {
@@ -1595,14 +1611,14 @@ async function loadValidationQueue() {
                 ${hasWaiver
                   ? `<span class="text-xs text-green-600 font-medium">Waiver ✓</span>`
                   : `<span class="text-xs text-red-500 font-medium">No waiver</span>`}
-                <span class="text-xs text-orange-600 font-medium">£3 reg fee due</span>
+                <span class="text-xs text-orange-600 font-medium">${sym}${regFee.toFixed(2)} reg fee due</span>
               </div>
             </div>
           </div>
           ${hasWaiver ? `
             <button onclick="event.stopPropagation(); validateRegistration('${m.id}')"
               class="flex-shrink-0 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg transition whitespace-nowrap">
-              Collect £3
+              Collect ${sym}${regFee.toFixed(2)}
             </button>` : `
             <button onclick="event.stopPropagation(); openMemberProfile('${m.id}')"
               class="flex-shrink-0 px-3 py-1.5 border border-orange-300 text-orange-600 text-xs font-medium rounded-lg hover:bg-orange-100 transition whitespace-nowrap">
@@ -7141,20 +7157,24 @@ document.head.appendChild(shakeStyle);
 
 // Gym name — loaded from settings, used throughout the UI
 window.gymName = 'Crux';
+window._gymSettings = {};
 async function loadGymName() {
   try {
     const settings = await api('GET', '/api/settings');
-    if (settings && settings.gym_name) {
-      window.gymName = settings.gym_name;
-      const sidebarFooter = document.getElementById('sidebar-gym-footer');
-      if (sidebarFooter) {
-        if (settings.gym_logo) {
-          sidebarFooter.innerHTML = `<img id="sidebar-logo-img" src="${settings.gym_logo}" style="max-height:32px;max-width:120px;object-fit:contain;" alt="${settings.gym_name}">`;
-        } else {
-          sidebarFooter.textContent = settings.gym_name;
+    if (settings) {
+      window._gymSettings = settings;
+      if (settings.gym_name) {
+        window.gymName = settings.gym_name;
+        const sidebarFooter = document.getElementById('sidebar-gym-footer');
+        if (sidebarFooter) {
+          if (settings.gym_logo) {
+            sidebarFooter.innerHTML = `<img id="sidebar-logo-img" src="${settings.gym_logo}" style="max-height:32px;max-width:120px;object-fit:contain;" alt="${settings.gym_name}">`;
+          } else {
+            sidebarFooter.textContent = settings.gym_name;
+          }
         }
+        document.title = settings.gym_name + ' · Crux';
       }
-      document.title = settings.gym_name + ' · Crux';
     }
   } catch (e) { /* settings not critical for startup */ }
 }
